@@ -48,9 +48,10 @@ function open(key: Buffer, sealed: Buffer): Buffer {
 export class Crypto {
   private readonly master: Buffer;
 
-  constructor(masterKeyBase64: string) {
-    this.master = Buffer.from(masterKeyBase64, "base64");
-    if (this.master.length !== 32) throw new Error("master key must be 32 bytes");
+  constructor(masterKey: string) {
+    const decoded = Buffer.from(masterKey, "base64");
+    // A base64 32-byte key is used as-is; any other secret (e.g. a platform-generated one) is hashed to 256 bits.
+    this.master = decoded.length === 32 ? decoded : createHash("sha256").update(masterKey, "utf8").digest();
   }
 
   encryptFile(plaintext: Buffer): { ciphertext: Buffer; wrappedKey: string } {

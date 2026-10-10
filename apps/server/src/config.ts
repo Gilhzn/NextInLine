@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-const base64Key = z
-  .string()
-  .refine((v) => Buffer.from(v, "base64").length === 32, "must be 32 bytes, base64-encoded");
+/** 32 random bytes (base64) – or any long random secret, from which a 256-bit key is derived. */
+const masterKey = z.string().min(32);
 
 const configSchema = z
   .object({
@@ -12,10 +11,12 @@ const configSchema = z
     HOST: z.string().default("0.0.0.0"),
     DATABASE_URL: z.string().url(),
     /** Base for signed file links. Empty = relative links (web app served from the same origin). */
-    PUBLIC_BASE_URL: z.union([z.literal(""), z.string().url()]).default("http://localhost:4000"),
+    PUBLIC_BASE_URL: z.union([z.literal(""), z.string().url()]).optional(),
+    /** Set automatically by Render for web services. */
+    RENDER_EXTERNAL_URL: z.string().url().optional(),
     JWT_SECRET: z.string().min(32),
     OTP_PEPPER: z.string().min(16),
-    MASTER_KEY: base64Key,
+    MASTER_KEY: masterKey,
     FILES_SIGNING_SECRET: z.string().min(32),
     STORAGE_DIR: z.string().default("./storage"),
     ADMIN_TOKEN: z.string().min(24),
@@ -37,7 +38,10 @@ const configSchema = z
     message: "OTP_DEV_CODE must not be set in production",
   });
 
-export type Config = z.output<typeof configSchema> & { extractionProvider: "claude" | "manual" };
+export type Config = Omit<z.output<typeof configSchema>, "PUBLIC_BASE_URL"> & {
+  PUBLIC_BASE_URL: string;
+  extractionProvider: "claude" | "manual";
+};
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = configSchema.safeParse(env);
@@ -48,6 +52,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const c = parsed.data;
   return {
     ...c,
+    // Explicit value wins; on Render use its public URL; when the server also serves the web app, links can be relative.
+    PUBLIC_BASE_URL: c.PUBLIC_BASE_URL ?? c.RENDER_EXTERNAL_URL ?? (c.WEB_DIR ? "" : "http://localhost:4000"),
     extractionProvider: c.EXTRACTION_PROVIDER ?? (c.ANTHROPIC_API_KEY ? "claude" : "manual"),
   };
 }
