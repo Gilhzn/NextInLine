@@ -2,12 +2,23 @@ import { useState } from "react";
 import { Alert, Platform } from "react-native";
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { CATEGORY_INFO, formatILS, type FeeDto } from "@magiali/shared";
 import { api, errorMessage } from "../api/client";
-import { keys, useMe } from "../api/hooks";
+import { keys, useClaims, useFees, useMe } from "../api/hooks";
 import { useAuth } from "../state/auth";
 import { colors, space } from "../theme";
-import { Body, Button, Card, Loading, Screen, Spread, Title } from "../ui";
+import { Badge, Body, Button, Card, Loading, Screen, Spread, Title } from "../ui";
 import { PaymentMethodForm } from "../ui/PaymentMethodForm";
+
+const FEE_STATUS: Record<FeeDto["status"], { label: string; tone: "primary" | "money" | "warning" | "danger" | "muted" }> = {
+  pending: { label: "ממתינה", tone: "muted" },
+  scheduled: { label: "מתוזמנת", tone: "primary" },
+  charged: { label: "חויבה", tone: "money" },
+  disputed: { label: "בבירור", tone: "warning" },
+  waived: { label: "בוטלה", tone: "muted" },
+  failed: { label: "החיוב נכשל", tone: "danger" },
+  refunded: { label: "הוחזרה", tone: "muted" },
+};
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === "web") return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? false);
@@ -21,6 +32,8 @@ function confirm(title: string, message: string): Promise<boolean> {
 
 export default function Settings() {
   const me = useMe();
+  const fees = useFees();
+  const claims = useClaims();
   const qc = useQueryClient();
   const { refreshToken, signOut } = useAuth();
   const [message, setMessage] = useState<string>();
@@ -66,6 +79,27 @@ export default function Settings() {
       <Card>
         <Body style={{ fontWeight: "700" }}>💳 אמצעי תשלום</Body>
         {me.data.hasPaymentMethod ? <Body>✓ שמור</Body> : <PaymentMethodForm onSaved={() => void qc.invalidateQueries({ queryKey: keys.me })} />}
+      </Card>
+
+      <Card>
+        <Body style={{ fontWeight: "700" }}>🧾 עמלות הצלחה</Body>
+        <Body muted>משלמים רק על כסף שהגיע לחשבון: 15% (20% בתביעה רטרו), עד 150 ₪ לתביעה. החיוב 3 ימים אחרי התשלום.</Body>
+        {fees.data?.length === 0 ? <Body muted>עדיין אין עמלות.</Body> : null}
+        {fees.data?.map((f) => {
+          const claim = claims.data?.find((c) => c.id === f.claimId);
+          const st = FEE_STATUS[f.status];
+          const date = f.chargedAt ?? f.scheduledFor;
+          return (
+            <Spread key={f.id} style={{ paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Body style={{ flex: 1 }}>
+                {claim ? `${CATEGORY_INFO[claim.category].icon} ${claim.providerName ?? CATEGORY_INFO[claim.category].label}` : "תביעה"}
+                {date ? ` · ${new Date(date).toLocaleDateString("he-IL")}` : ""}
+              </Body>
+              <Body style={{ fontWeight: "700" }}>{formatILS(f.amountAgorot)}</Body>
+              <Badge label={st.label} tone={st.tone} />
+            </Spread>
+          );
+        })}
       </Card>
 
       <Card>

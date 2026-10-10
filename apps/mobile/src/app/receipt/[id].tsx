@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, Switch, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,6 +34,7 @@ export default function ReceiptReview() {
   const [prefilled, setPrefilled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const [privacyPrivate, setPrivacyPrivate] = useState(false);
   const [noCoverage, setNoCoverage] = useState<RoutingResult | null>(null);
 
   const r = receipt.data;
@@ -76,7 +77,7 @@ export default function ReceiptReview() {
         sessions,
       });
       const isRetro = Date.now() - new Date(`${serviceDate}T00:00:00Z`).getTime() > SIX_MONTHS_MS;
-      const claim = await api<ClaimDto>("POST", "/v1/claims", { receiptIds: [id], isRetro });
+      const claim = await api<ClaimDto>("POST", "/v1/claims", { receiptIds: [id], isRetro, privacyPrivate });
       await qc.invalidateQueries({ queryKey: keys.home });
       await qc.invalidateQueries({ queryKey: keys.claims });
       router.replace(`/claim/${claim.id}`);
@@ -90,6 +91,28 @@ export default function ReceiptReview() {
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    const message = "הקבלה והתמונה יימחקו לצמיתות.";
+    const ok =
+      Platform.OS === "web"
+        ? (globalThis.confirm?.(`למחוק את הקבלה?\n\n${message}`) ?? false)
+        : await new Promise<boolean>((resolve) =>
+            Alert.alert("למחוק את הקבלה?", message, [
+              { text: "ביטול", style: "cancel", onPress: () => resolve(false) },
+              { text: "מחיקה", style: "destructive", onPress: () => resolve(true) },
+            ]),
+          );
+    if (!ok) return;
+    try {
+      await api("DELETE", `/v1/receipts/${id}`);
+      await qc.invalidateQueries({ queryKey: keys.receipts });
+      await qc.invalidateQueries({ queryKey: keys.home });
+      router.back();
+    } catch (e) {
+      setError(errorMessage(e));
     }
   }
 
@@ -162,6 +185,21 @@ export default function ReceiptReview() {
         </Row>
       </Spread>
 
+      {members.data && members.data.length > 1 ? (
+        <Spread style={{ marginBottom: space.lg }}>
+          <View style={{ flex: 1 }}>
+            <Text style={label}>תביעה פרטית 🔒</Text>
+            <Body muted>רק אתה ובן המשפחה שעליו התביעה יראו אותה</Body>
+          </View>
+          <Switch
+            value={privacyPrivate}
+            onValueChange={setPrivacyPrivate}
+            trackColor={{ true: colors.primary, false: colors.border }}
+            accessibilityLabel="תביעה פרטית"
+          />
+        </Spread>
+      ) : null}
+
       {noCoverage ? (
         <Card tone="warning">
           <Body style={{ fontWeight: "700" }}>לא מצאנו כיסוי שמחזיר כסף על הקבלה הזו</Body>
@@ -174,6 +212,7 @@ export default function ReceiptReview() {
         </Card>
       ) : null}
       {error ? <Body style={{ color: colors.danger }}>{error}</Body> : null}
+      <Button title="מחיקת הקבלה" variant="ghost" onPress={remove} />
       <View style={{ height: space.xl }} />
     </Screen>
   );

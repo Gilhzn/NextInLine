@@ -30,7 +30,42 @@ export const keys = {
   enrollments: (memberId: string) => ["members", memberId, "enrollments"] as const,
   fees: ["fees"] as const,
   pack: (claimId: string, legId: string) => ["claims", claimId, "pack", legId] as const,
+  notifications: ["notifications"] as const,
+  publicConfig: ["public-config"] as const,
 };
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: { claimId?: string; receiptId?: string; feeId?: string; memberId?: string } | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+/** Works signed-out: tells the app whether the fixed demo login code is active. */
+export const usePublicConfig = () =>
+  useQuery({
+    queryKey: keys.publicConfig,
+    queryFn: () => api<{ demoMode: boolean; demoLoginCode: string | null }>("GET", "/v1/public-config"),
+    staleTime: Infinity,
+  });
+
+export const useNotifications = () =>
+  useQuery({
+    queryKey: keys.notifications,
+    queryFn: () => api<NotificationItem[]>("GET", "/v1/notifications"),
+    refetchInterval: 30_000,
+  });
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api("POST", `/v1/notifications/${id}/read`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.notifications }),
+  });
+}
 
 export const useMe = (enabled = true) => useQuery({ queryKey: keys.me, queryFn: () => api<MeDto>("GET", "/v1/me"), enabled });
 export const useHome = () => useQuery({ queryKey: keys.home, queryFn: () => api<HomeDto>("GET", "/v1/home") });

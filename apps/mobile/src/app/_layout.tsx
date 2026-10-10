@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAuth } from "../state/auth";
 import { colors } from "../theme";
 import { ApiError } from "../api/client";
+import { Loading } from "../ui";
 
 // Hebrew-first app: native builds are forced RTL via the expo-localization plugin; this covers Expo Go.
 if (Platform.OS !== "web" && !I18nManager.isRTL) {
@@ -30,6 +31,7 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const accessToken = useAuth((s) => s.accessToken);
+  const hydrated = useAuth((s) => s.hydrated);
 
   useEffect(() => {
     void hydrate();
@@ -44,7 +46,8 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="dark" />
-        <Stack
+        {/* Screens mount only after the stored session is loaded, so a deep link's first request carries the token. */}
+        {!hydrated ? <Loading /> : <Stack
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.bg },
@@ -58,7 +61,8 @@ export default function RootLayout() {
           <Stack.Screen name="member/[id]" options={{ headerShown: true, title: "בן משפחה" }} />
           <Stack.Screen name="member/new" options={{ headerShown: true, title: "הוספת בן משפחה" }} />
           <Stack.Screen name="settings" options={{ headerShown: true, title: "הגדרות" }} />
-        </Stack>
+          <Stack.Screen name="notifications" options={{ headerShown: true, title: "התראות" }} />
+        </Stack>}
       </QueryClientProvider>
     </SafeAreaProvider>
   );

@@ -54,3 +54,27 @@ services:
       # Optional: receipts are read automatically when set (otherwise the user types the details).
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Optional real services. Each one switches on only when its keys are set. See docs/free-services.md
+      # Real SMS (Twilio). Also delete OTP_DEV_CODE, otherwise the login code stays 123456.
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      # Email (Resend, free up to 3,000 a month)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Persistent receipt storage (Cloudflare R2 / S3). The free Render disk is wiped on every deploy.
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+# Note: Render's free database expires after 30 days. For a database that does not expire, replace
+# DATABASE_URL with a Neon connection string (ending in ?sslmode=require). See docs/free-services.md

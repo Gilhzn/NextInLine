@@ -2,13 +2,15 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { normalizeIsraeliMobile } from "@magiali/shared";
 import { api, errorMessage } from "../../api/client";
-import { Body, Button, Field, Screen, Title } from "../../ui";
+import { usePublicConfig } from "../../api/hooks";
+import { Body, Button, Card, Field, Screen, Title } from "../../ui";
 
 export default function Phone() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const valid = normalizeIsraeliMobile(phone) !== null;
+  const demo = usePublicConfig().data;
 
   async function send() {
     setError(undefined);
@@ -37,6 +39,11 @@ export default function Phone() {
         autoFocus
         error={error}
       />
+      {demo?.demoMode ? (
+        <Card tone="primary">
+          <Body>🧪 סביבת הדגמה: אפשר להזין כל מספר נייד ישראלי (למשל 050-1234567). לא יישלח SMS.</Body>
+        </Card>
+      ) : null}
       <Body muted>בהמשך נבקש הסכמה לתנאי השימוש ולמדיניות הפרטיות.</Body>
     </Screen>
   );

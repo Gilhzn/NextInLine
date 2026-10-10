@@ -3,9 +3,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AuthResponseDto } from "@magiali/shared";
 import { api, errorMessage } from "../../api/client";
-import { keys } from "../../api/hooks";
+import { keys, usePublicConfig } from "../../api/hooks";
 import { useAuth } from "../../state/auth";
-import { Button, Field, Screen, Title } from "../../ui";
+import { Body, Button, Card, Field, Screen, Title } from "../../ui";
 
 export default function Otp() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
@@ -14,6 +14,7 @@ export default function Otp() {
   const [loading, setLoading] = useState(false);
   const setTokens = useAuth((s) => s.setTokens);
   const qc = useQueryClient();
+  const demo = usePublicConfig().data;
 
   async function verify(value = code) {
     setError(undefined);
@@ -49,6 +50,19 @@ export default function Otp() {
       }
     >
       <Title sub={`שלחנו קוד בן 6 ספרות ל-${phone ?? ""}`}>מה הקוד?</Title>
+      {demo?.demoLoginCode ? (
+        <Card tone="primary">
+          <Body>🧪 סביבת הדגמה: לא נשלח SMS אמיתי. קוד הכניסה הוא {demo.demoLoginCode}</Body>
+          <Button
+            title="מלא את הקוד"
+            variant="secondary"
+            onPress={() => {
+              setCode(demo.demoLoginCode!);
+              void verify(demo.demoLoginCode!);
+            }}
+          />
+        </Card>
+      ) : null}
       <Field
         label="קוד מה-SMS"
         value={code}

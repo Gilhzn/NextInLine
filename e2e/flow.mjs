@@ -1,7 +1,7 @@
 // End-to-end walkthrough of the real app (web build) against the real server, with screenshots.
 //   BASE_URL=http://localhost:4000 node e2e/flow.mjs
 // Env: BASE_URL, OUT_DIR (default e2e/screenshots), CHROMIUM_PATH (optional explicit browser binary).
-import { mkdirSync } from "node:fs";
+import fs, { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
 
@@ -27,7 +27,14 @@ const page = await context.newPage();
 page.on("pageerror", (e) => errors.push(e.message));
 const vis = (locator) => locator.filter({ visible: true });
 const click = (name) => vis(page.getByRole("button", { name })).first().click();
-const see = (text, timeout = 30_000) => vis(page.getByText(text)).first().waitFor({ timeout });
+const see = (text, timeout = 30_000) =>
+  vis(page.getByText(text))
+    .first()
+    .waitFor({ timeout })
+    .catch(async (e) => {
+      await page.screenshot({ path: path.join(OUT, "FAILED.png") }).catch(() => {});
+      throw e;
+    });
 let n = 0;
 const shot = async (name) => {
   await page.waitForTimeout(700);
@@ -37,6 +44,16 @@ const shot = async (name) => {
 };
 
 const phone = `05${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+const phoneE164 = `+972${phone.slice(1)}`;
+
+/** The ops console token: $ADMIN_TOKEN, or the one `npm run demo` generated in apps/server/.env. */
+function adminToken() {
+  if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
+  const envFile = fs.readFileSync(path.resolve("apps/server/.env"), "utf8");
+  const line = envFile.split("\n").find((l) => l.startsWith("ADMIN_TOKEN="));
+  if (!line) throw new Error("ADMIN_TOKEN not found");
+  return line.slice("ADMIN_TOKEN=".length).trim().replace(/^"|"$/g, "");
+}
 
 await page.goto(BASE_URL);
 await see("בוא נבדוק כמה מגיע לי");
@@ -46,7 +63,9 @@ await click("בוא נבדוק כמה מגיע לי");
 await vis(page.getByLabel("מספר נייד")).fill(phone);
 await shot("phone");
 await click("שלחו לי קוד");
-await vis(page.getByLabel("קוד מה-SMS")).fill("123456");
+await see("סביבת הדגמה");
+await shot("otp-demo");
+await click("מלא את הקוד");
 
 await see("על מי נבדוק?");
 await vis(page.getByLabel("השם שלך")).fill("מיכל כהן");
@@ -123,6 +142,51 @@ await click("הכסף הגיע ✓");
 await see("ממתין לשלב הקודם", 2000).catch(() => {});
 await see("מוכן להגשה");
 await shot("first-payment");
+const claimUrl = page.url();
+
+// Second leg: the user submits to the private insurer; operations (standing in for the insurer) pays it.
+await click("פתח תיק מוכן להגשה");
+await see("הגשה להראל");
+await click("הגשתי ✓ תעקבו בשבילי");
+await see("קיבלת תשובה מהראל?");
+
+const ops = await context.newPage();
+ops.on("pageerror", (e) => errors.push(`ops: ${e.message}`));
+const opsVis = (l) => l.filter({ visible: true });
+await ops.goto(`${BASE_URL}/ops`);
+await opsVis(ops.getByPlaceholder("ADMIN_TOKEN")).fill(adminToken());
+await opsVis(ops.getByRole("button", { name: "כניסה" })).click();
+const legCard = opsVis(ops.locator("#legs .card")).filter({ hasText: phoneE164 }).filter({ hasText: "הראל" }).first();
+await legCard.waitFor({ timeout: 15_000 });
+const opsShot = async (name) => {
+  n += 1;
+  await ops.screenshot({ path: path.join(OUT, `${String(n).padStart(2, "0")}-${name}.png`), fullPage: true });
+  console.log(`✓ ${name}`);
+};
+const toast = (text) => ops.locator("#msg").filter({ hasText: text }).waitFor({ timeout: 15_000 });
+await opsShot("ops-queue");
+await legCard.getByRole("button", { name: "בבדיקה" }).click();
+await toast("✓ בבדיקה");
+await legCard.getByRole("button", { name: "💸 שולם" }).click();
+await toast("✓ שולם");
+const feeCard = opsVis(ops.locator("#fees .card")).filter({ hasText: phoneE164 }).first();
+await feeCard.getByRole("button", { name: /חייב עכשיו/ }).click();
+await toast("✓ חויב");
+await opsShot("ops-fee-charged");
+await ops.close();
+
+await page.goto(claimUrl);
+await see("הכסף הגיע");
+await shot("claim-completed");
+
+await page.goto(`${BASE_URL}/notifications`);
+await see(/שולם|הכסף/);
+await shot("notifications");
+
+await page.goto(`${BASE_URL}/settings`);
+await see("עמלות הצלחה");
+await see("חויבה");
+await shot("settings-fees");
 
 await page.goto(`${BASE_URL}/benefits`);
 await vis(page.getByLabel("חיפוש")).fill("פסיכולוג");
