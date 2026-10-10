@@ -189,3 +189,43 @@ describe("daily maintenance", () => {
     expect(first).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("operator sign-in", () => {
+  it("operators listed in OPS_PHONES sign in by SMS code and their actions are attributed to them", async () => {
+    env.deps.config.OPS_PHONES = "050-1112233";
+    expectStatus(await env.app.inject({ method: "POST", url: "/ops/login/request", payload: { phone: "0501112233" } }), 204);
+    const code = env.sms.lastCodeFor("+972501112233");
+    const session = expectStatus(
+      await env.app.inject({ method: "POST", url: "/ops/login/verify", payload: { phone: "0501112233", code } }),
+      200,
+    );
+    const ok = await env.app.inject({ method: "GET", url: "/admin/overview", headers: { authorization: `Bearer ${session.token}` } });
+    expect(ok.statusCode).toBe(200);
+
+    // A user's app token is not an ops session.
+    const user = await login(env, "0557777000");
+    const denied = await env.app.inject({ method: "GET", url: "/admin/overview", headers: { authorization: `Bearer ${user.token}` } });
+    expect(denied.statusCode).toBe(401);
+
+    // Unlisted numbers get the same answer but no code.
+    const before = env.sms.sent.length;
+    expectStatus(await env.app.inject({ method: "POST", url: "/ops/login/request", payload: { phone: "0509999999" } }), 204);
+    expect(env.sms.sent.length).toBe(before);
+
+    // Removing someone from the list ends their session immediately.
+    env.deps.config.OPS_PHONES = "";
+    const removed = await env.app.inject({ method: "GET", url: "/admin/overview", headers: { authorization: `Bearer ${session.token}` } });
+    expect(removed.statusCode).toBe(401);
+  });
+
+  it("the shared admin token does not work in production", async () => {
+    const prev = env.deps.config.NODE_ENV;
+    env.deps.config.NODE_ENV = "production";
+    try {
+      const res = await env.app.inject({ method: "GET", url: "/admin/overview", headers: { "x-admin-token": "test-admin-token-0123456789abcdef" } });
+      expect(res.statusCode).toBe(401);
+    } finally {
+      env.deps.config.NODE_ENV = prev;
+    }
+  });
+});

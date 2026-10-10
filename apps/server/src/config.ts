@@ -52,6 +52,8 @@ const configSchema = z
     CARDCOM_API_PASSWORD: z.string().optional(),
     CARDCOM_DOCUMENT_TYPE: z.enum(["Auto", "Receipt", "TaxInvoiceAndReceipt"]).default("Auto"),
     CARDCOM_BASE_URL: z.string().url().optional(),
+    /** Operators allowed into /ops, by mobile number (comma separated). Each signs in with an SMS code. */
+    OPS_PHONES: z.string().optional(),
     /** Days after a claim closes before its images are deleted (privacy: data minimisation). */
     RECEIPT_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
     // Business details shown in the terms, privacy policy and power of attorney (required in production).

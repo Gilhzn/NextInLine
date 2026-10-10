@@ -9,14 +9,30 @@ import { parse } from "../http";
 import { audit } from "../services/audit";
 import { transitionLeg } from "../services/claims";
 import { refundFee, resolveFee } from "../services/fees";
+import { adminTokenAllowed, verifyOpsSession } from "../services/ops-auth";
 
 /** Operations back-office. MVP: shared token; production: SSO + per-operator identity. */
 export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<void> {
+  // Each operator signs in with their own phone (Bearer ops session); every action is attributed to them.
+  // The shared x-admin-token works only outside production (local demo, tests).
+  app.decorateRequest("operator", "");
   app.addHook("onRequest", async (req) => {
-    const token = req.headers["x-admin-token"];
-    if (typeof token !== "string" || !safeEqualHex(sha256Hex(token), sha256Hex(deps.config.ADMIN_TOKEN))) {
-      throw new AppError("unauthorized", "admin token required");
+    const bearer = req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : null;
+    const operator = bearer ? await verifyOpsSession(deps, bearer) : null;
+    if (operator) {
+      req.operator = operator;
+      return;
     }
+    const token = req.headers["x-admin-token"];
+    if (
+      adminTokenAllowed(deps) &&
+      typeof token === "string" &&
+      safeEqualHex(sha256Hex(token), sha256Hex(deps.config.ADMIN_TOKEN))
+    ) {
+      req.operator = "admin-token";
+      return;
+    }
+    throw new AppError("unauthorized", "נדרשת כניסת צוות");
   });
 
   app.get<{ Querystring: { status?: string } }>("/legs", async (req) => {
@@ -53,9 +69,9 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
       reason: input.reason,
       payerReference: input.payerReference,
       actor: "ops",
-      actorId: "admin",
+      actorId: req.operator,
     });
-    await audit(deps.sql, { actorKind: "ops", action: "leg_status_set", entity: "claim_leg", entityId: id, meta: { to: input.status } });
+    await audit(deps.sql, { actorKind: "ops", action: "leg_status_set", entity: "claim_leg", entityId: id, meta: { to: input.status, operator: req.operator } });
     const [leg] = await deps.sql`SELECT id, status, paid_agorot FROM claim_legs WHERE id = ${id}`;
     return leg;
   });
@@ -72,6 +88,7 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
       z.object({ action: z.enum(["charge", "waive", "charge_now", "refund"]), reason: z.string().max(300).optional() }),
       req.body,
     );
+    await audit(deps.sql, { actorKind: "ops", action: `fee_${input.action}`, entity: "fee", entityId: id, meta: { operator: req.operator } });
     if (input.action === "refund") return refundFee(deps, id, input.reason ?? "ops");
     return resolveFee(deps, id, input.action);
   });
@@ -94,11 +111,18 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
       req.body,
     );
     const version = await publishCatalogVersion(deps.sql, input.benefits, input.notes);
-    await audit(deps.sql, { actorKind: "ops", action: "catalog_published", entity: "catalog", entityId: String(version) });
+    await audit(deps.sql, { actorKind: "ops", action: "catalog_published", entity: "catalog", entityId: String(version), meta: { operator: req.operator } });
     return { version };
   });
 
   app.get("/jobs/failed", async () =>
     deps.sql`SELECT id, type, attempts, last_error, failed_at FROM jobs WHERE failed_at IS NOT NULL ORDER BY failed_at DESC LIMIT 100`,
   );
+}
+
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Who is acting in /admin: the operator's phone, or "admin-token" outside production. */
+    operator: string;
+  }
 }

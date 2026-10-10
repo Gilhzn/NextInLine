@@ -1,4 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { normalizeIsraeliMobile } from "@magiali/shared";
+import type { Deps } from "../context";
+import { parse } from "../http";
+import { adminTokenAllowed, requestOpsCode, verifyOpsCode } from "../services/ops-auth";
 
 /**
  * Operations console (spec §14, v1.1): a single page over the admin API.
@@ -49,9 +54,16 @@ const PAGE = /* html */ `<!doctype html>
 
 <section id="login" class="card" hidden>
   <h2 style="margin-top:0">כניסת צוות</h2>
-  <p class="meta">הזן את ה-ADMIN_TOKEN של השרת (ב-Render: השירות ← Environment).</p>
-  <input id="token" type="password" placeholder="ADMIN_TOKEN" style="width:100%" />
-  <div class="actions"><button class="primary" id="loginBtn">כניסה</button></div>
+  <p class="meta">כל איש צוות נכנס עם הטלפון שלו (רשום ב-OPS_PHONES), וכל פעולה נרשמת על שמו.</p>
+  <input id="opsPhone" inputmode="tel" placeholder="מספר נייד" style="width:100%" />
+  <div class="actions"><button id="sendCode">שלחו קוד</button></div>
+  <input id="opsCode" inputmode="numeric" maxlength="6" placeholder="קוד מה-SMS" style="width:100%;margin-top:8px" hidden />
+  <div class="actions"><button class="primary" id="verifyCode" hidden>כניסה עם קוד</button></div>
+  <div id="tokenLogin" hidden>
+    <p class="meta">סביבת פיתוח: אפשר גם עם ה-ADMIN_TOKEN של השרת.</p>
+    <input id="token" type="password" placeholder="ADMIN_TOKEN" style="width:100%" />
+    <div class="actions"><button class="primary" id="loginBtn">כניסה</button></div>
+  </div>
 </section>
 
 <main id="app" hidden>
@@ -81,7 +93,9 @@ const TABS = [
   { key:"paid,rejected", label:"נסגרו" },
 ];
 let tab = TABS[0].key;
-let token = sessionStorage.getItem("magiali.ops") || "";
+// { bearer } for an operator session, { admin } for the development token.
+let auth = JSON.parse(sessionStorage.getItem("magiali.ops") || "null");
+const authHeaders = () => (auth?.bearer ? { authorization: "Bearer " + auth.bearer } : auth?.admin ? { "x-admin-token": auth.admin } : {});
 
 function el(tag, attrs = {}, ...children) {
   const n = document.createElement(tag);
@@ -94,10 +108,10 @@ function el(tag, attrs = {}, ...children) {
 function toast(t) { const m = $("msg"); m.textContent = t; m.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => (m.style.display = "none"), 3500); }
 
 async function api(method, path, body) {
-  const res = await fetch(path, { method, headers: { "x-admin-token": token, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(path, { method, headers: { ...authHeaders(), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
-  if (res.status === 401) { logout(); throw new Error("טוקן לא תקין"); }
+  if (res.status === 401) { logout(); throw new Error("צריך להתחבר מחדש"); }
   if (!res.ok) throw new Error(data?.error?.message || ("שגיאה " + res.status));
   return data;
 }
@@ -159,21 +173,50 @@ async function load() {
 }
 
 function show() {
-  $("login").hidden = !!token; $("app").hidden = !token;
-  if (token) load().catch((e) => toast(e.message));
+  $("login").hidden = !!auth; $("app").hidden = !auth;
+  $("who").textContent = auth?.who ? "מחובר/ת: " + auth.who : "";
+  if (auth) load().catch((e) => toast(e.message));
 }
-function logout() { token = ""; sessionStorage.removeItem("magiali.ops"); show(); }
-$("loginBtn").onclick = () => { token = $("token").value.trim(); sessionStorage.setItem("magiali.ops", token); show(); };
+function setAuth(a) { auth = a; if (a) sessionStorage.setItem("magiali.ops", JSON.stringify(a)); else sessionStorage.removeItem("magiali.ops"); show(); }
+function logout() { setAuth(null); }
+async function post(path, body) {
+  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error?.message || "שגיאה");
+  return data;
+}
+$("sendCode").onclick = async () => {
+  try { await post("/ops/login/request", { phone: $("opsPhone").value }); $("opsCode").hidden = false; $("verifyCode").hidden = false; toast("אם המספר רשום כצוות, נשלח אליו קוד"); }
+  catch (e) { toast("✕ " + e.message); }
+};
+$("verifyCode").onclick = async () => {
+  try { const r = await post("/ops/login/verify", { phone: $("opsPhone").value, code: $("opsCode").value }); setAuth({ bearer: r.token, who: r.operator }); }
+  catch (e) { toast("✕ " + e.message); }
+};
+fetch("/ops/config").then((r) => r.json()).then((c) => { $("tokenLogin").hidden = !c.tokenLoginAllowed; }).catch(() => {});
+$("loginBtn").onclick = () => setAuth({ admin: $("token").value.trim(), who: "טוקן פיתוח" });
 $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loginBtn").click(); });
 $("refresh").onclick = () => load().catch((e) => toast(e.message));
 $("logout").onclick = logout;
-setInterval(() => { if (token && document.visibilityState === "visible") load().catch(() => {}); }, 15000);
+setInterval(() => { if (auth && document.visibilityState === "visible") load().catch(() => {}); }, 15000);
 show();
 </script>
 </body>
 </html>`;
 
-export async function opsRoutes(app: FastifyInstance): Promise<void> {
+export async function opsRoutes(app: FastifyInstance, deps: Deps): Promise<void> {
+  const limit = { config: { rateLimit: { max: deps.config.OTP_ROUTE_LIMIT_PER_10MIN, timeWindow: "10 minutes" } } };
+  app.get("/ops/config", async () => ({ tokenLoginAllowed: adminTokenAllowed(deps) }));
+  app.post("/ops/login/request", limit, async (req, reply) => {
+    const { phone } = parse(z.object({ phone: z.string().max(30) }), req.body);
+    await requestOpsCode(deps, phone, req.ip);
+    return reply.code(204).send();
+  });
+  app.post("/ops/login/verify", limit, async (req) => {
+    const { phone, code } = parse(z.object({ phone: z.string().max(30), code: z.string().regex(/^\d{6}$/) }), req.body);
+    const token = await verifyOpsCode(deps, phone, code, req.ip);
+    return { token, operator: normalizeIsraeliMobile(phone) };
+  });
   app.get("/ops", async (_req, reply) =>
     reply.header("Content-Type", "text/html; charset=utf-8").header("Cache-Control", "no-store").header("X-Robots-Tag", "noindex").send(PAGE),
   );

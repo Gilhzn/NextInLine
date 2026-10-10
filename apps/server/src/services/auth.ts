@@ -12,10 +12,10 @@ const REFRESH_TTL_MS = 30 * 86_400_000;
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_MAX_PER_PHONE_10MIN = 3;
-const ISSUER = "magiali";
+export const ISSUER = "magiali";
 const AUDIENCE = "magiali-app";
 
-function key(deps: Deps): Uint8Array {
+export function key(deps: Deps): Uint8Array {
   return new TextEncoder().encode(deps.config.JWT_SECRET);
 }
 
@@ -27,7 +27,7 @@ export function otpHash(deps: Deps, phone: string, code: string): string {
 export async function createOtpChallenge(
   deps: Deps,
   db: Db,
-  input: { phone: string; purpose: "login" | "member_consent"; memberId?: string; ip?: string },
+  input: { phone: string; purpose: "login" | "member_consent" | "ops_login"; memberId?: string; ip?: string },
 ): Promise<string> {
   const now = deps.now();
   const [phoneCount] = await db`
@@ -56,7 +56,7 @@ export async function createOtpChallenge(
 export async function consumeOtpChallenge(
   deps: Deps,
   db: Db,
-  input: { phone: string; code: string; purpose: "login" | "member_consent"; memberId?: string },
+  input: { phone: string; code: string; purpose: "login" | "member_consent" | "ops_login"; memberId?: string },
 ): Promise<void> {
   const [challenge] = await db`
     SELECT id, code_hash, expires_at, attempts FROM otp_challenges

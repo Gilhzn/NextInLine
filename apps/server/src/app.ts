@@ -59,7 +59,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   await app.register(async (scope) => publicRoutes(scope, deps));
   await app.register(async (scope) => userRoutes(scope, deps), { prefix: "/v1" });
   await app.register(async (scope) => adminRoutes(scope, deps), { prefix: "/admin" });
-  await app.register(async (scope) => opsRoutes(scope));
+  await app.register(async (scope) => opsRoutes(scope, deps));
   await app.register(async (scope) => paymentRoutes(scope, deps));
   await app.register(async (scope) => legalRoutes(scope, deps));
   if (deps.config.WEB_DIR) {

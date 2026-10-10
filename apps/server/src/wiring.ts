@@ -100,6 +100,7 @@ export function productionProblems(config: Config, summary: ProviderSummary): st
   if (config.WEB_DIR && !config.PUBLIC_BASE_URL.startsWith("https://") && config.PUBLIC_BASE_URL !== "") {
     problems.push("PUBLIC_BASE_URL must be https in production");
   }
+  if (!config.OPS_PHONES) problems.push("OPS_PHONES: list the operators' mobile numbers for /ops (the shared token is off in production)");
   const legal = ["LEGAL_ENTITY_NAME", "LEGAL_ENTITY_ID", "LEGAL_ADDRESS", "CONTACT_EMAIL", "DPO_NAME", "DPO_EMAIL"] as const;
   const missingLegal = legal.filter((k) => !config[k]);
   if (missingLegal.length) problems.push(`Legal details for the terms and privacy policy: set ${missingLegal.join(", ")}`);
