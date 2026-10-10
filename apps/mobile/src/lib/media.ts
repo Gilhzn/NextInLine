@@ -55,6 +55,26 @@ export async function pickPdf(): Promise<PickResult> {
   };
 }
 
+/** The Har HaBituach report: Excel as downloaded, CSV, PDF, or a screenshot. */
+export async function pickPolicyReport(): Promise<PickResult> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
+      "text/comma-separated-values",
+      "application/pdf",
+      "image/*",
+    ],
+    multiple: false,
+  });
+  if (result.canceled) return { ok: false, reason: "cancelled" };
+  return {
+    ok: true,
+    files: result.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType || "application/octet-stream", name: a.name })),
+  };
+}
+
 export function uploadReceipt(file: LocalFile, memberId?: string): Promise<ReceiptDto> {
   return upload<ReceiptDto>("/v1/receipts", file, memberId ? { memberId } : {});
 }

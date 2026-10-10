@@ -14,17 +14,14 @@ export default function MemberScreen() {
   const enrollments = useEnrollments(id);
   const qc = useQueryClient();
   const [selection, setSelection] = useState<CoverageSelection>(emptySelection);
-  const [loaded, setLoaded] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean }>();
 
+  // Re-sync whenever the saved enrollments change (e.g. after an import), so saving never drops them.
   useEffect(() => {
-    if (enrollments.data && !loaded) {
-      setSelection(enrollmentsToSelection(enrollments.data));
-      setLoaded(true);
-    }
-  }, [enrollments.data, loaded]);
+    if (enrollments.data) setSelection(enrollmentsToSelection(enrollments.data));
+  }, [enrollments.data]);
 
   const member = members.data?.find((m) => m.id === id);
   if (!member || !plans.data || !enrollments.data) return <Loading />;
@@ -73,6 +70,7 @@ export default function MemberScreen() {
       ) : null}
 
       <Card>
+        <Button title="ייבוא מהר הביטוח" icon="📥" variant="secondary" onPress={() => router.push("/import")} />
         <CoveragePicker plans={plans.data} value={selection} onChange={setSelection} />
       </Card>
 

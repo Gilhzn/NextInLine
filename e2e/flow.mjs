@@ -4,6 +4,7 @@
 import fs, { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
+import ExcelJS from "exceljs";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:4000";
 const OUT = path.resolve(process.env.OUT_DIR ?? "e2e/screenshots");
@@ -20,6 +21,19 @@ await receiptPage.setContent(`<html dir="rtl"><body style="font-family:sans-seri
   <div>קבלה מס' 1042</div><div>תאריך: 12/09/2026</div><div>שם המטופל: נועה כהן</div>
   <div>טיפול קלינאות תקשורת – מפגש 1</div><h3>סה"כ שולם: 350.00 ₪</h3></body></html>`);
 const receiptPath = path.join(OUT, "_receipt.png");
+
+// The user's Har HaBituach report, as downloaded from the Finance Ministry's site.
+const reportPath = path.join(OUT, "_har-habituach.xlsx");
+{
+  const wb = new ExcelJS.Workbook();
+  const sheet = wb.addWorksheet("פוליסות");
+  sheet.addRow(["הר הביטוח – ריכוז פוליסות"]);
+  sheet.addRow(["ענף ראשי", "ענף (משני)", "סוג מוצר", "חברה", "תקופת ביטוח", "מספר פוליסה", "סיווג תכנית"]);
+  sheet.addRow(["ביטוח בריאות", "כתב שירות", "טיפולים ואבחונים לילד", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "521-778899", "פרט"]);
+  sheet.addRow(["ביטוח בריאות", "ניתוחים בארץ", "ניתוחים", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "800-1", "פרט"]);
+  sheet.addRow(["ביטוח חיים", "ריסק", "ריסק", "מגדל", "01/01/2019 - ", "R-1", "פרט"]);
+  await wb.xlsx.writeFile(reportPath);
+}
 await receiptPage.screenshot({ path: receiptPath, fullPage: true });
 await receiptPage.close();
 
@@ -81,7 +95,21 @@ await click("המשך");
 await see("איך אתם מבוטחים?");
 await vis(page.getByRole("button", { name: "כללית", exact: true })).click();
 await click("כללית מושלם זהב");
-await click("הראל – טיפולים ואבחונים לילד");
+
+// Import private policies from Har HaBituach instead of guessing them.
+await click("ייבוא מהר הביטוח");
+await see("איך זה עובד");
+const reportChooser = page.waitForEvent("filechooser");
+await click("העלאת הקובץ מהר הביטוח");
+await (await reportChooser).setFiles(reportPath);
+await see("הראל – טיפולים ואבחונים לילד");
+await see("עוד 2 ביטוחים שלא מחזירים על קבלות");
+await shot("har-habituach-preview");
+await click(/הוספת 1 ביטוחים/);
+await see("הביטוחים נוספו");
+await click("המשך");
+await see("איך אתם מבוטחים?");
+await see("✓ הראל – טיפולים ואבחונים לילד");
 await shot("coverage");
 await click("המשך");
 

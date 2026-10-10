@@ -3,6 +3,7 @@ import type { Deps } from "./context";
 import { Crypto } from "./crypto";
 import type { Sql } from "./db";
 import { ClaudeExtractor, ManualExtractor } from "./extraction";
+import { ClaudePolicyReader, ManualPolicyReader } from "./policy-reader";
 import { ConsoleEmail, ConsoleSms, ExpoPushProvider, LocalDiskStorage, MockPayments } from "./providers";
 import { CardcomPayments, ResendEmail, S3Storage, TwilioSms } from "./providers.production";
 
@@ -66,6 +67,7 @@ export function createDeps(config: Config, sql: Sql): { deps: Deps; summary: Pro
     payments,
     email,
     extractor,
+    policyReader: config.extractionProvider === "claude" ? new ClaudePolicyReader(config.ANTHROPIC_API_KEY) : new ManualPolicyReader(),
     now: () => new Date(),
   };
 

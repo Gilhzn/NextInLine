@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Switch, Text } from "react-native";
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, errorMessage } from "../../api/client";
-import { keys, useMe, usePlans, useSetOnboardingStep } from "../../api/hooks";
+import { keys, useEnrollments, useMe, usePlans, useSetOnboardingStep } from "../../api/hooks";
 import { colors, space } from "../../theme";
 import { Body, Button, Card, Loading, Row, Screen, Title } from "../../ui";
-import { CoveragePicker, emptySelection, selectionToEnrollments, type CoverageSelection } from "../../ui/CoveragePicker";
+import { CoveragePicker, emptySelection, enrollmentsToSelection, selectionToEnrollments, type CoverageSelection } from "../../ui/CoveragePicker";
 
 export default function Coverage() {
   const me = useMe();
@@ -17,6 +17,29 @@ export default function Coverage() {
   const [selections, setSelections] = useState<Record<string, CoverageSelection>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const selfId = me.data?.members.find((m) => m.isSelf)?.id ?? "";
+  const selfEnrollments = useEnrollments(selfId);
+
+  // Policies imported from Har HaBituach (or saved earlier) show up as selected – each one once, so a plan the
+  // user then unticks stays unticked.
+  const seen = useRef(new Set<string>());
+  useEffect(() => {
+    if (!selfEnrollments.data || !selfId) return;
+    const fresh = selfEnrollments.data.filter((e) => !seen.current.has(e.planId));
+    if (fresh.length === 0) return;
+    for (const e of fresh) seen.current.add(e.planId);
+    const saved = enrollmentsToSelection(fresh);
+    setSelections((s) => {
+      const current = s[selfId] ?? emptySelection;
+      return {
+        ...s,
+        [selfId]: {
+          shabanPlanId: current.shabanPlanId ?? saved.shabanPlanId,
+          privatePlans: { ...current.privatePlans, ...saved.privatePlans },
+        },
+      };
+    });
+  }, [selfEnrollments.data, selfId]);
 
   if (!me.data || !plans.data) return <Loading />;
   const members = me.data.members;
@@ -44,6 +67,11 @@ export default function Coverage() {
   return (
     <Screen footer={<Button title="המשך" onPress={save} loading={saving} />}>
       <Title sub="ככה נדע ממי מגיע לכם כסף, ובאיזה סדר">איך אתם מבוטחים?</Title>
+      <Card tone="primary">
+        <Body style={{ fontWeight: "700" }}>📥 לא בטוחים איזה ביטוח פרטי יש לכם?</Body>
+        <Body>מייבאים את הרשימה הרשמית מהר הביטוח של משרד האוצר, ואנחנו מזהים מה מחזיר כסף.</Body>
+        <Button title="ייבוא מהר הביטוח" variant="secondary" onPress={() => router.push({ pathname: "/import", params: { next: "/coverage" } })} />
+      </Card>
       {members.length > 1 ? (
         <Row style={{ marginBottom: space.lg }}>
           <Switch value={sameForAll} onValueChange={setSameForAll} trackColor={{ true: colors.primary, false: colors.border }} />

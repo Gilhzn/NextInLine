@@ -105,13 +105,19 @@ export async function putEnrollments(
     const shabanCount = plans.filter((p) => p.planKind === "shaban").length;
     if (shabanCount > 1) throw new AppError("validation_error", "אפשר לבחור רמת שב\"ן אחת בלבד");
   }
+  // Sync, don't recreate: plans that stay keep the user's own terms, policy number, dates and import source.
   await deps.sql.begin(async (tx) => {
-    await tx`DELETE FROM enrollments WHERE member_id = ${memberId}`;
+    await tx`
+      DELETE FROM enrollments WHERE member_id = ${memberId}
+        AND NOT (plan_id = ANY(${planIds}::text[]))`;
     for (const e of enrollments) {
       await tx`
         INSERT INTO enrollments (member_id, plan_id, is_shaban_supplement, policy_number_enc)
         VALUES (${memberId}, ${e.planId}, ${e.isShabanSupplement},
-                ${e.policyNumber ? deps.crypto.encryptString(e.policyNumber) : null})`;
+                ${e.policyNumber ? deps.crypto.encryptString(e.policyNumber) : null})
+        ON CONFLICT (member_id, plan_id) DO UPDATE SET
+          is_shaban_supplement = EXCLUDED.is_shaban_supplement,
+          policy_number_enc = COALESCE(EXCLUDED.policy_number_enc, enrollments.policy_number_enc)`;
     }
   });
 }

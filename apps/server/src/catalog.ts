@@ -85,7 +85,13 @@ export const SEED_PAYERS: SeedPayer[] = [
   },
   { id: "phoenix", name: "הפניקס", kind: "insurer", webUrl: "https://www.fnx.co.il", avgProcessingDays: 14 },
   { id: "migdal", name: "מגדל", kind: "insurer", webUrl: "https://www.migdal.co.il", avgProcessingDays: 14 },
+  { id: "menora", name: "מנורה מבטחים", kind: "insurer", webUrl: "https://www.menoramivt.co.il", avgProcessingDays: 14 },
+  { id: "ayalon", name: "איילון", kind: "insurer", webUrl: "https://www.ayalon-ins.co.il", avgProcessingDays: 14 },
+  { id: "hachshara", name: "הכשרה", kind: "insurer", webUrl: "https://www.hcsra.co.il", avgProcessingDays: 14 },
 ];
+
+/** Every private insurer gets a generic individual plan and a group plan whose terms the user enters from the policy. */
+const PRIVATE_INSURERS = ["harel", "clal", "phoenix", "migdal", "menora", "ayalon", "hachshara"] as const;
 
 const official = (rule: RuleInput, source: string, note?: string): SeedBenefit => ({ rule, confidence: "official", source, note });
 const secondary = (rule: RuleInput, source: string, note?: string): SeedBenefit => ({ rule, confidence: "secondary", source, note });
@@ -244,16 +250,27 @@ export const SEED_PLANS: SeedPlan[] = [
   { id: "phoenix_consult_6782", payerId: "phoenix", name: "הפניקס – ייעוץ ובדיקות", kind: "private_individual", description: "תכנית 6782, מהדורה 11/2024", benefits: phoenixConsult },
   { id: "migdal_consult_2395", payerId: "migdal", name: "מגדל – ייעוץ ובדיקות אבחנתיות", kind: "private_individual", description: "מורחב 2395, 03/2024", benefits: migdalConsult },
   { id: "migdal_complementary", payerId: "migdal", name: "מגדל – רפואה משלימה", kind: "private_individual", description: "כתב שירות 2386", benefits: migdalComplementary },
-  ...(["harel", "clal", "phoenix", "migdal"] as const).map(
-    (payerId): SeedPlan => ({
-      id: `group_${payerId}`,
-      payerId,
-      name: `ביטוח קבוצתי (מהעבודה) – ${SEED_PAYERS.find((p) => p.id === payerId)!.name}`,
-      kind: "private_group",
-      description: "התנאים שונים בכל מקום עבודה – מזינים אותם מהפוליסה",
-      benefits: {},
-    }),
-  ),
+  ...PRIVATE_INSURERS.flatMap((payerId): SeedPlan[] => {
+    const name = SEED_PAYERS.find((p) => p.id === payerId)!.name;
+    return [
+      {
+        id: `${payerId}_health`,
+        payerId,
+        name: `${name} – ביטוח בריאות (תנאים לפי הפוליסה)`,
+        kind: "private_individual",
+        description: "לא זיהינו את המוצר המדויק – מזינים את התנאים מהפוליסה",
+        benefits: {},
+      },
+      {
+        id: `group_${payerId}`,
+        payerId,
+        name: `ביטוח קבוצתי (מהעבודה) – ${name}`,
+        kind: "private_group",
+        description: "התנאים שונים בכל מקום עבודה – מזינים אותם מהפוליסה",
+        benefits: {},
+      },
+    ];
+  }),
 ];
 
 /**

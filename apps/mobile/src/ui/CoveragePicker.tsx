@@ -42,7 +42,8 @@ export function CoveragePicker({
   const payers = [...new Map(shabanPlans.map((p) => [p.payerId, p.payerName])).entries()];
   const selectedShaban = shabanPlans.find((p) => p.id === value.shabanPlanId);
   const payerId = selectedShaban?.payerId ?? null;
-  const privatePlans = plans.filter((p) => p.kind !== "shaban");
+  // "<insurer> – ביטוח בריאות" plans exist for imports from Har HaBituach; offer them only once chosen.
+  const privatePlans = plans.filter((p) => p.kind !== "shaban" && (!p.id.endsWith("_health") || p.id in value.privatePlans));
 
   return (
     <View style={{ gap: space.lg }}>

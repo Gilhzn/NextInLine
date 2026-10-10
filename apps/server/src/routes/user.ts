@@ -9,6 +9,7 @@ import {
   consentSchema,
   enrollmentsPutSchema,
   policyTermPutSchema,
+  policyImportApplySchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
   meUpdateSchema,
@@ -40,6 +41,7 @@ import { coverageMap, getPolicyTerms, routeForMember, setPolicyTerm } from "../s
 import { disputeFee, listFees } from "../services/fees";
 import { refreshCardSetup, startCardSetup } from "../services/payments";
 import { grantConsent, revokeConsent } from "../services/consents";
+import { applyPolicyImport, previewPolicyImport } from "../services/policy-import";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
 import { getMe, getMemberForHousehold, listMembers, memberDto } from "../services/households";
@@ -193,6 +195,14 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
       description: (r.description as string | null) ?? null,
     }));
   });
+
+  // Import from Har HaBituach: preview (nothing saved, file discarded), then apply what the user confirmed.
+  app.post("/coverage/import", async (req) => {
+    const upload = await readUpload(req);
+    return previewPolicyImport(deps, auth(req), upload.data);
+  });
+
+  app.post("/coverage/import/apply", async (req) => applyPolicyImport(deps, auth(req), parse(policyImportApplySchema, req.body)));
 
   app.get("/coverage/map", async (req) => coverageMap(deps.sql, auth(req).householdId, deps.now()));
 

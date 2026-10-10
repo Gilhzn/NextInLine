@@ -106,3 +106,27 @@ describe("catalog sync", () => {
     );
   });
 });
+
+describe("saving coverage", () => {
+  it("keeps the user's own policy terms for plans that stay selected", async () => {
+    const s = await login(env, "0558080808");
+    const user = api(env, s.token);
+    const selfId = s.me.members[0].id;
+    expectStatus(await user.put(`/v1/members/${selfId}/enrollments`, { enrollments: [{ planId: "group_harel" }] }), 200);
+    expectStatus(
+      await user.put(`/v1/members/${selfId}/enrollments/group_harel/terms`, { category: "psychology", rule: { percent: 60 } }),
+      200,
+    );
+    // Saving the coverage screen again (same plan + a new one) must not wipe the terms.
+    expectStatus(
+      await user.put(`/v1/members/${selfId}/enrollments`, { enrollments: [{ planId: "group_harel" }, { planId: "clalit_mushlam" }] }),
+      200,
+    );
+    const terms = expectStatus(await user.get(`/v1/members/${selfId}/enrollments/group_harel/terms`), 200);
+    expect(terms.terms.find((t: any) => t.category === "psychology").custom).toMatchObject({ percent: 60 });
+    // Removing a plan still removes it.
+    expectStatus(await user.put(`/v1/members/${selfId}/enrollments`, { enrollments: [{ planId: "clalit_mushlam" }] }), 200);
+    const left = expectStatus(await user.get(`/v1/members/${selfId}/enrollments`), 200);
+    expect(left.map((e: any) => e.planId)).toEqual(["clalit_mushlam"]);
+  });
+});

@@ -1,4 +1,5 @@
 import { useTestCatalog } from "./catalog.fixture";
+import type { PolicyReportReader, RawPolicy } from "../src/policy-reader";
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import type { ExtractedFields } from "@magiali/shared";
@@ -37,6 +38,17 @@ export class FakeExtractor implements ReceiptExtractor {
   }
 }
 
+/** Returns whatever policies the test sets, as if the AI had read a screenshot. */
+export class FakePolicyReader implements PolicyReportReader {
+  readonly name = "fake";
+  next: RawPolicy[] = [];
+  calls = 0;
+  async read(): Promise<RawPolicy[]> {
+    this.calls++;
+    return this.next;
+  }
+}
+
 export interface TestEnv {
   app: FastifyInstance;
   deps: Deps;
@@ -46,6 +58,7 @@ export interface TestEnv {
   email: MemoryEmail;
   payments: MockPayments;
   extractor: FakeExtractor;
+  policyReader: FakePolicyReader;
   clock: { readonly now: Date; advanceDays(days: number): void };
   runJobs(): Promise<number>;
   close(): Promise<void>;
@@ -90,6 +103,7 @@ export async function createTestEnv(): Promise<TestEnv> {
   const email = new MemoryEmail();
   const payments = new MockPayments();
   const extractor = new FakeExtractor();
+  const policyReader = new FakePolicyReader();
   const deps: Deps = {
     config,
     sql,
@@ -100,6 +114,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     payments,
     email,
     extractor,
+    policyReader,
     now: () => clock.now,
   };
   const app = await buildApp(deps);
@@ -113,6 +128,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     email,
     payments,
     extractor,
+    policyReader,
     clock,
     async runJobs() {
       let total = 0;

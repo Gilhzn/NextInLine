@@ -344,3 +344,46 @@ export interface SubmissionPackDto {
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
+
+// ---------- Import from Har HaBituach (the Finance Ministry's "insurance mountain" report) ----------
+
+export type PolicyRelevance = "relevant" | "maybe" | "not_relevant";
+
+/** One policy row read from the user's Har HaBituach report, with our best match in the catalog. */
+export interface ImportedPolicyDto {
+  key: string;
+  insurer: string | null;
+  branch: string | null;
+  product: string | null;
+  isGroup: boolean;
+  policyNumber: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  insuredName: string | null;
+  relevance: PolicyRelevance;
+  reason: string;
+  /** exact = product identified; likely = insurer + product type; generic = insurer only (terms to be entered) */
+  match: { planId: string; planName: string; confidence: "exact" | "likely" | "generic" } | null;
+  alreadyEnrolled: boolean;
+}
+
+export interface PolicyImportPreviewDto {
+  source: "spreadsheet" | "ai";
+  policies: ImportedPolicyDto[];
+  notes: string[];
+}
+
+export const policyImportApplySchema = z.object({
+  memberIds: z.array(z.uuid()).min(1).max(20),
+  items: z
+    .array(
+      z.object({
+        planId: z.string().min(1).max(60),
+        policyNumber: z.string().max(40).nullable().optional(),
+        startDate: z.iso.date().nullable().optional(),
+        endDate: z.iso.date().nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
