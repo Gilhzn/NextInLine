@@ -265,6 +265,9 @@ export interface FeeDto {
   status: "pending" | "scheduled" | "charged" | "disputed" | "waived" | "failed" | "refunded";
   scheduledFor: string | null;
   chargedAt: string | null;
+  /** Tax receipt issued by the payment provider with the charge. */
+  documentNumber: string | null;
+  documentUrl: string | null;
 }
 
 export interface HomeDto {

@@ -49,6 +49,27 @@ export async function resolveFee(deps: Deps, feeId: string, action: "charge" | "
   return feeDto(after!);
 }
 
+/** Operations: return a fee that was charged (e.g. the payer clawed the money back). */
+export async function refundFee(deps: Deps, feeId: string, reason: string): Promise<FeeDto> {
+  const [fee] = await deps.sql`SELECT * FROM fees WHERE id = ${feeId}`;
+  if (!fee) throw notFound("העמלה");
+  if (fee.status !== "charged" || !fee.providerChargeId) throw new AppError("conflict", "אפשר להחזיר רק עמלה שחויבה");
+  const result = await deps.payments.refund({ chargeId: fee.providerChargeId as string, amountAgorot: fee.amountAgorot as number });
+  if (!result.ok) throw new AppError("conflict", `ההחזר נכשל: ${result.reason}`);
+  const [updated] = await deps.sql`
+    UPDATE fees SET status = 'refunded', refunded_at = ${deps.now()}, provider_refund_id = ${result.refundId}, updated_at = ${deps.now()}
+    WHERE id = ${feeId} AND status = 'charged' RETURNING *`;
+  const [h] = await deps.sql`SELECT owner_user_id FROM households WHERE id = ${fee.householdId as string}`;
+  await notify(deps.sql, deps.now(), h!.ownerUserId as string, {
+    type: "fee_refunded",
+    title: `החזרנו לך את העמלה (${formatILS(fee.amountAgorot as number)})`,
+    body: "הסכום יחזור לכרטיס שלך תוך כמה ימי עסקים",
+    data: { feeId, claimId: fee.claimId as string },
+  });
+  await audit(deps.sql, { actorKind: "ops", action: "fee_refunded", entity: "fee", entityId: feeId, meta: { reason } });
+  return feeDto(updated!);
+}
+
 class RetryableChargeError extends Error {}
 
 async function markFailed(deps: Deps, feeId: string, reason: string): Promise<void> {
@@ -74,9 +95,9 @@ export async function chargeFee(deps: Deps, feeId: string): Promise<void> {
   if ((fee.scheduledFor as Date) > deps.now()) return;
 
   const [pm] = await deps.sql`
-    SELECT pm.provider_token_enc FROM payment_methods pm
-    JOIN households h ON h.owner_user_id = pm.user_id
-    WHERE h.id = ${fee.householdId as string} AND pm.deleted_at IS NULL
+    SELECT pm.provider_token_enc, u.display_name, u.phone_e164 FROM payment_methods pm
+    JOIN households h ON h.owner_user_id = pm.user_id JOIN users u ON u.id = pm.user_id
+    WHERE h.id = ${fee.householdId as string} AND pm.deleted_at IS NULL AND pm.provider = ${deps.payments.name}
     ORDER BY pm.is_default DESC, pm.created_at DESC LIMIT 1`;
   if (!pm) {
     await markFailed(deps, feeId, "no_payment_method");
@@ -86,16 +107,20 @@ export async function chargeFee(deps: Deps, feeId: string): Promise<void> {
   const result = await deps.payments.charge({
     token: deps.crypto.decryptString(pm.providerTokenEnc as string),
     amountAgorot: fee.amountAgorot as number,
-    idempotencyKey: feeId,
+    idempotencyKey: `${feeId}-${fee.chargeAttempts as number}`,
     description: "מגיע לי – עמלת הצלחה",
+    customer: { name: pm.displayName as string | null, phone: pm.phoneE164 as string },
   });
   if (!result.ok) {
+    // A definitive answer from the provider: the next attempt needs a fresh key.
+    await deps.sql`UPDATE fees SET charge_attempts = charge_attempts + 1 WHERE id = ${feeId}`;
     if (result.retryable) throw new RetryableChargeError(result.reason);
     await markFailed(deps, feeId, result.reason);
     return;
   }
   await deps.sql`
-    UPDATE fees SET status = 'charged', charged_at = ${deps.now()}, provider_charge_id = ${result.chargeId}, updated_at = ${deps.now()}
+    UPDATE fees SET status = 'charged', charged_at = ${deps.now()}, provider_charge_id = ${result.chargeId},
+           document_number = ${result.documentNumber ?? null}, document_url = ${result.documentUrl ?? null}, updated_at = ${deps.now()}
     WHERE id = ${feeId}`;
 }
 

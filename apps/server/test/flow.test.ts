@@ -1,14 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, api, createTestEnv, expectStatus, fakeImage, login, type TestEnv } from "./helpers";
+import { addCard, admin, api, createTestEnv, expectStatus, fakeImage, login, type TestEnv } from "./helpers";
 
 let env: TestEnv;
 let user: ReturnType<typeof api>;
 let childId: string;
+let userToken: string;
 
 beforeAll(async () => {
   env = await createTestEnv();
   const session = await login(env);
   user = api(env, session.token);
+  userToken = session.token;
 
   expectStatus(await user.patch("/v1/me", { displayName: "מיכל כהן", onboardingStep: "coverage" }), 200);
   const selfId = session.me.members[0].id;
@@ -149,13 +151,13 @@ describe("full claim lifecycle", () => {
     expect(done.totalPaidAgorot).toBe(28200);
     expect(done.fee).toMatchObject({ status: "scheduled", amountAgorot: 4230, rateBps: 1500 });
 
-    expectStatus(await user.post("/v1/payment-methods", { provider: "mock", token: "tok_visa_4242", brand: "visa", last4: "4242" }), 201);
+    await addCard(env, userToken, "tok_visa_4242");
     await env.runJobs();
     expect(env.payments.charges).toHaveLength(0); // not due yet
 
     env.clock.advanceDays(3);
     await env.runJobs();
-    expect(env.payments.charges).toEqual([{ token: "tok_visa_4242", amountAgorot: 4230, idempotencyKey: done.fee.id, description: "מגיע לי – עמלת הצלחה" }]);
+    expect(env.payments.charges).toEqual([{ token: "tok_visa_4242", amountAgorot: 4230, idempotencyKey: `${done.fee.id}-0`, description: "מגיע לי – עמלת הצלחה" }]);
     const charged = expectStatus(await user.get(`/v1/claims/${claimId}`), 200);
     expect(charged.fee.status).toBe("charged");
 

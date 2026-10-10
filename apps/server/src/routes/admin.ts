@@ -8,7 +8,7 @@ import { AppError } from "../errors";
 import { parse } from "../http";
 import { audit } from "../services/audit";
 import { transitionLeg } from "../services/claims";
-import { resolveFee } from "../services/fees";
+import { refundFee, resolveFee } from "../services/fees";
 
 /** Operations back-office. MVP: shared token; production: SSO + per-operator identity. */
 export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<void> {
@@ -68,8 +68,12 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
 
   app.post<{ Params: { id: string } }>("/fees/:id/resolve", async (req) => {
     const { id } = parse(z.object({ id: z.uuid() }), req.params);
-    const { action } = parse(z.object({ action: z.enum(["charge", "waive", "charge_now"]) }), req.body);
-    return resolveFee(deps, id, action);
+    const input = parse(
+      z.object({ action: z.enum(["charge", "waive", "charge_now", "refund"]), reason: z.string().max(300).optional() }),
+      req.body,
+    );
+    if (input.action === "refund") return refundFee(deps, id, input.reason ?? "ops");
+    return resolveFee(deps, id, input.action);
   });
 
   app.post("/catalog/publish", async (req) => {

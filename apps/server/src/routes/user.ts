@@ -35,6 +35,8 @@ import {
 } from "../services/claims";
 import { coverageMap, routeForMember } from "../services/coverage";
 import { disputeFee, listFees } from "../services/fees";
+import { refreshCardSetup, startCardSetup } from "../services/payments";
+import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
 import { getMe, getMemberForHousehold, listMembers, memberDto } from "../services/households";
 import {
@@ -265,31 +267,25 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
 
   app.get("/payment-methods", async (req) => {
     const rows = await deps.sql`
-      SELECT id, provider, brand, last4, is_default, created_at FROM payment_methods
+      SELECT id, provider, brand, last4, exp_month, exp_year, is_default, created_at FROM payment_methods
       WHERE user_id = ${auth(req).userId} AND deleted_at IS NULL ORDER BY created_at DESC`;
     return rows;
   });
 
-  app.post("/payment-methods", async (req, reply) => {
-    const ctx = auth(req);
+  // Saving a card: the app opens the provider's hosted page, then polls until the provider confirms.
+  app.post("/payment-methods/setup", async (req) => {
     const input = parse(
-      z.object({
-        provider: z.string().min(2).max(30),
-        token: z.string().min(4).max(500),
-        brand: z.string().max(30).optional(),
-        last4: z.string().regex(/^\d{4}$/).optional(),
-      }),
+      z.object({ platform: z.enum(["web", "native"]), returnUrl: z.string().max(300).optional() }),
       req.body,
     );
-    if (input.provider !== deps.payments.name) throw new AppError("validation_error", "ספק תשלום לא נתמך");
-    await deps.sql.begin(async (tx) => {
-      await tx`UPDATE payment_methods SET is_default = false WHERE user_id = ${ctx.userId}`;
-      await tx`
-        INSERT INTO payment_methods (user_id, provider, provider_token_enc, brand, last4, is_default)
-        VALUES (${ctx.userId}, ${input.provider}, ${deps.crypto.encryptString(input.token)}, ${input.brand ?? null},
-                ${input.last4 ?? null}, true)`;
-    });
-    return reply.code(201).send(await getMe(deps, ctx.userId));
+    return startCardSetup(deps, auth(req), { ...input, origin: publicOrigin(deps, req) });
+  });
+
+  app.get("/payment-methods/setup/:id", async (req) => {
+    const { id } = parse(idParam, req.params);
+    const ctx = auth(req);
+    const status = await refreshCardSetup(deps, id, { userId: ctx.userId });
+    return { status, me: status === "completed" ? await getMe(deps, ctx.userId) : undefined };
   });
 
   app.delete("/payment-methods/:id", async (req, reply) => {

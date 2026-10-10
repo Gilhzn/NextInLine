@@ -191,3 +191,12 @@ export function expectStatus(res: LightMyRequestResponse, status: number): any {
   }
   return res.body ? res.json() : undefined;
 }
+
+/** Saves a card the way the app does: start a hosted-page setup, let the (mock) provider complete it, poll. */
+export async function addCard(env: TestEnv, token: string, cardToken = "tok_test"): Promise<any> {
+  const user = api(env, token);
+  const setup = expectStatus(await user.post("/v1/payment-methods/setup", { platform: "web" }), 200);
+  const [row] = await env.sql`SELECT provider_ref FROM payment_setups WHERE id = ${setup.setupId}`;
+  env.payments.completeForTest(row!.providerRef as string, cardToken);
+  return expectStatus(await user.get(`/v1/payment-methods/setup/${setup.setupId}`), 200);
+}

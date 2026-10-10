@@ -131,13 +131,14 @@ function legCard(l) {
 function feeCard(f) {
   const actions = el("div", { class: "actions" });
   if (f.status === "scheduled") actions.append(el("button", { class: "primary", onclick: () => act("חויב", () => api("POST", "/admin/fees/" + f.id + "/resolve", { action: "charge_now" })) }, "חייב עכשיו (בלי להמתין 3 ימים)"));
+  if (f.status === "charged") actions.append(el("button", { class: "danger", onclick: () => { const reason = prompt("סיבת ההחזר:", "הכסף לא הגיע למשתמש"); if (reason !== null) act("הוחזר", () => api("POST", "/admin/fees/" + f.id + "/resolve", { action: "refund", reason })); } }, "החזר כספי"));
   if (["disputed","failed"].includes(f.status)) {
     actions.append(el("button", { onclick: () => act("חויב", () => api("POST", "/admin/fees/" + f.id + "/resolve", { action: "charge" })) }, "חייב"));
     actions.append(el("button", { class: "danger", onclick: () => act("בוטל", () => api("POST", "/admin/fees/" + f.id + "/resolve", { action: "waive" })) }, "ויתור על העמלה"));
   }
   return el("div", { class: "card" },
     el("div", { class: "row" }, el("strong", {}, ils(f.amountAgorot) + " (" + f.rateBps / 100 + "% מ-" + ils(f.baseAgorot) + ")"), el("span", { class: "badge" }, FEE[f.status] || f.status)),
-    el("div", { class: "meta" }, "משתמש " + (f.ownerPhone || "") + (f.scheduledFor ? " · מתוזמן ל-" + new Date(f.scheduledFor).toLocaleString("he-IL") : "") + (f.disputeReason ? " · מחלוקת: " + f.disputeReason : "") + (f.failureReason ? " · כשל: " + f.failureReason : "")),
+    el("div", { class: "meta" }, "משתמש " + (f.ownerPhone || "") + (f.scheduledFor ? " · מתוזמן ל-" + new Date(f.scheduledFor).toLocaleString("he-IL") : "") + (f.disputeReason ? " · מחלוקת: " + f.disputeReason : "") + (f.failureReason ? " · כשל: " + f.failureReason : "") + (f.documentNumber ? " · קבלה " + f.documentNumber : "")),
     actions);
 }
 

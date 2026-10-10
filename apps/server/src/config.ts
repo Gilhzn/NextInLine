@@ -46,6 +46,12 @@ const configSchema = z
     S3_REGION: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
+    // Cardcom (payments). Test terminal: 1000 – see docs/production.md.
+    CARDCOM_TERMINAL_NUMBER: z.coerce.number().int().positive().optional(),
+    CARDCOM_API_NAME: z.string().optional(),
+    CARDCOM_API_PASSWORD: z.string().optional(),
+    CARDCOM_DOCUMENT_TYPE: z.enum(["Auto", "Receipt", "TaxInvoiceAndReceipt"]).default("Auto"),
+    CARDCOM_BASE_URL: z.string().url().optional(),
     SENTRY_DSN: z.string().url().optional(),
     SENTRY_ENVIRONMENT: z.string().optional(),
     /** Build identifier shown in error reports (Render sets RENDER_GIT_COMMIT). */

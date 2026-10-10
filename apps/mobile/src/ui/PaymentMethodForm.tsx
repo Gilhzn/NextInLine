@@ -1,43 +1,38 @@
 import { useState } from "react";
 import { View } from "react-native";
-import { api, errorMessage } from "../api/client";
+import { errorMessage } from "../api/client";
+import { saveCardWithProvider } from "../lib/payments";
 import { space } from "../theme";
-import { Body, Button, Field } from ".";
+import { Body, Button } from ".";
 
 /**
- * Development stand-in for the payment provider's hosted card fields.
- * In production the PSP SDK tokenizes the card on-device and only the token reaches our server.
+ * Saving a card for the success fee. The card is typed on the payment provider's secure page (Cardcom);
+ * we only receive a token. Nothing is charged now.
  */
-export function PaymentMethodForm({ onSaved }: { onSaved: () => void }) {
-  const [card, setCard] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>();
-  const digits = card.replace(/\D/g, "");
+export function PaymentMethodForm({ onSaved, returnTo }: { onSaved: () => void; returnTo: string }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string>();
 
-  async function save() {
-    setSaving(true);
-    setError(undefined);
+  async function start() {
+    setBusy(true);
+    setMessage(undefined);
     try {
-      await api("POST", "/v1/payment-methods", {
-        provider: "mock",
-        token: `tok_dev_${digits.slice(-4)}_${Date.now()}`,
-        brand: "card",
-        last4: digits.slice(-4),
-      });
-      setCard("");
-      onSaved();
+      const res = await saveCardWithProvider(returnTo);
+      if (res.status === "completed") onSaved();
+      else if (res.status === "failed") setMessage("הכרטיס לא אושר. נסה כרטיס אחר.");
+      else if (res.status === "cancelled") setMessage("לא נשמר כרטיס. אפשר לנסות שוב.");
     } catch (e) {
-      setError(errorMessage(e));
+      setMessage(errorMessage(e));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
   return (
     <View style={{ gap: space.xs }}>
-      <Field label="מספר כרטיס (סביבת פיתוח)" value={card} onChangeText={setCard} keyboardType="number-pad" placeholder="4580 0000 0000 0000" error={error} />
-      <Button title="שמירת אמצעי תשלום" variant="secondary" onPress={save} loading={saving} disabled={digits.length < 12} />
-      <Body muted>בגרסת הייצור: Apple Pay / Google Pay / Bit / כרטיס דרך ספק סליקה מאובטח.</Body>
+      <Button title="הוספת כרטיס אשראי" icon="💳" variant="secondary" onPress={start} loading={busy} />
+      <Body muted>🔒 הכרטיס מוזן בדף המאובטח של חברת הסליקה. לא יבוצע חיוב עכשיו.</Body>
+      {message ? <Body>{message}</Body> : null}
     </View>
   );
 }

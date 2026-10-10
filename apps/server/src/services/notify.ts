@@ -9,6 +9,7 @@ export type NotificationType =
   | "leg_rejected"
   | "fee_upcoming"
   | "fee_failed"
+  | "fee_refunded"
   | "claim_submitted"
   | "expiry_warning"
   | "slow_payer";

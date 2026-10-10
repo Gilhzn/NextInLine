@@ -78,7 +78,7 @@ export default function Settings() {
 
       <Card>
         <Body style={{ fontWeight: "700" }}>💳 אמצעי תשלום</Body>
-        {me.data.hasPaymentMethod ? <Body>✓ שמור</Body> : <PaymentMethodForm onSaved={() => void qc.invalidateQueries({ queryKey: keys.me })} />}
+        {me.data.hasPaymentMethod ? <Body>✓ שמור</Body> : <PaymentMethodForm returnTo="/settings" onSaved={() => void qc.invalidateQueries({ queryKey: keys.me })} />}
       </Card>
 
       <Card>

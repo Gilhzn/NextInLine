@@ -5,7 +5,7 @@ import { createSql, migrate } from "./db";
 import { captureError, flushMonitoring, initMonitoring } from "./monitoring";
 import { ensureDailyMaintenance } from "./services/maintenance";
 import { startWorker } from "./services/jobs";
-import { createDeps } from "./wiring";
+import { createDeps, productionProblems, productionWarnings } from "./wiring";
 import "./services/register";
 
 async function main(): Promise<void> {
@@ -18,6 +18,11 @@ async function main(): Promise<void> {
 
   const { deps, summary } = createDeps(config, sql);
   console.info(`services: ${Object.entries(summary).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
+  for (const w of productionWarnings(config, summary)) console.warn(`⚠ ${w}`);
+  const problems = productionProblems(config, summary);
+  if (problems.length) {
+    throw new Error(`Production mode refuses to start with stand-in services:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
+  }
 
   const stops: Array<() => Promise<void>> = [];
   if (config.ROLE === "api" || config.ROLE === "all") {

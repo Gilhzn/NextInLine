@@ -112,27 +112,103 @@ export class MemoryPush implements PushProvider {
 
 // ---------- Payments ----------
 
-export type ChargeResult = { ok: true; chargeId: string } | { ok: false; reason: string; retryable: boolean };
+export type ChargeResult =
+  | { ok: true; chargeId: string; documentNumber?: string; documentUrl?: string }
+  | { ok: false; reason: string; retryable: boolean };
+
+export type RefundResult = { ok: true; refundId: string } | { ok: false; reason: string };
+
+export interface PaymentCustomer {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+/** The card is entered on the provider's hosted page; we only ever see the resulting token. */
+export type CardSetupResult =
+  | { status: "pending" }
+  | { status: "failed"; reason: string }
+  | { status: "completed"; token: string; brand?: string; last4?: string; expMonth?: number; expYear?: number };
 
 export interface PaymentProvider {
   readonly name: string;
-  charge(input: { token: string; amountAgorot: number; idempotencyKey: string; description: string }): Promise<ChargeResult>;
+  /** Opens a hosted "save card" page (no charge). `reference` is our setup id, echoed back by the provider. */
+  startCardSetup(input: {
+    reference: string;
+    successUrl: string;
+    failureUrl: string;
+    webhookUrl: string;
+    customer: PaymentCustomer;
+  }): Promise<{ url: string; providerRef: string }>;
+  getCardSetupResult(providerRef: string): Promise<CardSetupResult>;
+  /** Merchant-initiated charge of a saved token. `idempotencyKey` must make retries safe. */
+  charge(input: {
+    token: string;
+    amountAgorot: number;
+    idempotencyKey: string;
+    description: string;
+    customer?: PaymentCustomer;
+  }): Promise<ChargeResult>;
+  refund(input: { chargeId: string; amountAgorot: number }): Promise<RefundResult>;
 }
 
 /**
- * Stand-in for an Israeli PSP with tokenization (card / Bit / Apple Pay / Google Pay).
- * Tokens starting with "fail_" are declined, which lets tests exercise the retry path.
+ * Development stand-in for the payment provider. It serves its own "hosted page" (/payments/mock/:ref) so the app
+ * goes through exactly the same redirect flow as with the real provider. Card numbers starting with 4000 0000 0000 0002
+ * are declined at setup; tokens starting with "fail_" are declined when charged.
  */
 export class MockPayments implements PaymentProvider {
   readonly name = "mock";
-  readonly charges: Array<{ token: string; amountAgorot: number; idempotencyKey: string }> = [];
+  readonly charges: Array<{ token: string; amountAgorot: number; idempotencyKey: string; description: string }> = [];
+  readonly refunds: Array<{ chargeId: string; amountAgorot: number }> = [];
+  private readonly setups = new Map<string, CardSetupResult & { successUrl: string; failureUrl: string }>();
 
-  async charge(input: { token: string; amountAgorot: number; idempotencyKey: string }): Promise<ChargeResult> {
+  constructor(private readonly baseUrl = "") {}
+
+  async startCardSetup(input: { reference: string; successUrl: string; failureUrl: string }) {
+    const providerRef = `mock_${input.reference}`;
+    this.setups.set(providerRef, { status: "pending", successUrl: input.successUrl, failureUrl: input.failureUrl });
+    return { url: `${this.baseUrl}/payments/mock/${providerRef}`, providerRef };
+  }
+
+  /** Called by the mock hosted page. Returns where to send the browser next. */
+  completeMockSetup(providerRef: string, cardNumber: string): string | null {
+    const setup = this.setups.get(providerRef);
+    if (!setup || setup.status !== "pending") return null;
+    const digits = cardNumber.replace(/\D/g, "");
+    if (digits.length < 12 || digits.startsWith("4000000000000002")) {
+      this.setups.set(providerRef, { ...setup, status: "failed", reason: "card_declined" } as never);
+      return setup.failureUrl;
+    }
+    const token = digits.startsWith("0000") ? `fail_${providerRef}` : `tok_${providerRef}`;
+    this.setups.set(providerRef, { ...setup, status: "completed", token, brand: "visa", last4: digits.slice(-4), expMonth: 12, expYear: 2030 } as never);
+    return setup.successUrl;
+  }
+
+  /** Test helper: completes a setup without the page. */
+  completeForTest(providerRef: string, token: string, last4 = "4242"): void {
+    const setup = this.setups.get(providerRef);
+    if (setup) this.setups.set(providerRef, { ...setup, status: "completed", token, brand: "visa", last4, expMonth: 12, expYear: 2030 } as never);
+  }
+
+  async getCardSetupResult(providerRef: string): Promise<CardSetupResult> {
+    const setup = this.setups.get(providerRef);
+    if (!setup) return { status: "failed", reason: "unknown_setup" };
+    const { successUrl: _s, failureUrl: _f, ...result } = setup;
+    return result as CardSetupResult;
+  }
+
+  async charge(input: { token: string; amountAgorot: number; idempotencyKey: string; description: string }): Promise<ChargeResult> {
     const previous = this.charges.find((c) => c.idempotencyKey === input.idempotencyKey);
     if (previous) return { ok: true, chargeId: `mock_${input.idempotencyKey}` };
     if (input.token.startsWith("fail_")) return { ok: false, reason: "card_declined", retryable: true };
-    this.charges.push(input);
-    return { ok: true, chargeId: `mock_${input.idempotencyKey}` };
+    this.charges.push({ token: input.token, amountAgorot: input.amountAgorot, idempotencyKey: input.idempotencyKey, description: input.description });
+    return { ok: true, chargeId: `mock_${input.idempotencyKey}`, documentNumber: `DEMO-${this.charges.length}` };
+  }
+
+  async refund(input: { chargeId: string; amountAgorot: number }): Promise<RefundResult> {
+    this.refunds.push(input);
+    return { ok: true, refundId: `refund_${input.chargeId}` };
   }
 }
 

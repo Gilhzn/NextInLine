@@ -99,10 +99,16 @@ await shot("retro-upload");
 await click("המשך");
 
 await see("כמעט סיימנו");
-await vis(page.getByRole("checkbox")).first().click();
-await vis(page.getByLabel("מספר כרטיס (סביבת פיתוח)")).fill("4580123412341234");
-await click("שמירת אמצעי תשלום");
+// The card is typed on the payment provider's hosted page (the demo serves a stand-in of it), then the app resumes.
+await click("הוספת כרטיס אשראי");
+await page.waitForURL(/\/payments\/mock\//);
+await page.getByLabel("מספר כרטיס").fill("4580123412341234");
+await shot("hosted-card-page");
+await page.getByRole("button", { name: "שמירת הכרטיס" }).click();
+await see("הכרטיס נשמר");
+await see("כמעט סיימנו");
 await see("אמצעי תשלום נשמר");
+await vis(page.getByRole("checkbox")).first().click();
 await shot("agreements");
 await click("סיימנו, בוא נתחיל");
 

@@ -89,7 +89,7 @@ export default function Agreements() {
             <Body>✓ אמצעי תשלום נשמר</Body>
           </View>
         ) : (
-          <PaymentMethodForm onSaved={() => void qc.invalidateQueries({ queryKey: keys.me })} />
+          <PaymentMethodForm returnTo="/agreements" onSaved={() => void qc.invalidateQueries({ queryKey: keys.me })} />
         )}
       </Card>
       {error ? <Body style={{ color: colors.danger }}>{error}</Body> : null}

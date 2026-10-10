@@ -3,7 +3,7 @@ import { loadConfig } from "../src/config";
 import { ResendEmail, TwilioSms } from "../src/providers.production";
 import { ensureDailyMaintenance, nudgeSlowPayers, warnExpiringReceipts } from "../src/services/maintenance";
 import { createDeps } from "../src/wiring";
-import { admin, api, createTestEnv, expectStatus, fakeImage, login, type TestEnv } from "./helpers";
+import { addCard, admin, api, createTestEnv, expectStatus, fakeImage, login, type TestEnv } from "./helpers";
 
 function fakeFetch(status = 200) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
@@ -134,7 +134,7 @@ describe("demo & operations", () => {
     const claim = expectStatus(await user.post("/v1/claims", { receiptIds: [r.id] }), 201);
     expectStatus(await user.post(`/v1/claims/${claim.id}/submit`), 200);
     expectStatus(await user.post(`/v1/claims/${claim.id}/legs/${claim.legs[0].id}/status`, { status: "submitted" }), 200);
-    expectStatus(await user.post("/v1/payment-methods", { provider: "mock", token: "tok_ops", last4: "4242" }), 201);
+    await addCard(env, session.token, "tok_ops");
 
     const queue = expectStatus(await admin(env).get("/admin/legs?status=submitted,in_review"), 200);
     const leg = queue.find((l: any) => l.claimId === claim.id);

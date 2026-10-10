@@ -246,6 +246,8 @@ export function feeDto(f: Record<string, unknown>): FeeDto {
     status: f.status as FeeDto["status"],
     scheduledFor: iso(f.scheduledFor as Date | null),
     chargedAt: iso(f.chargedAt as Date | null),
+    documentNumber: (f.documentNumber as string | null) ?? null,
+    documentUrl: (f.documentUrl as string | null) ?? null,
   };
 }
 
