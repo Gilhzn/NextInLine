@@ -4,5 +4,6 @@
 
 - 💡 [חור בשוק: כסף רפואי שלא נתבע ("מגיע לי")](docs/market-gap-idea.md)
 - ⚖️ ["מגיע לי": בדיקת רגולציה והיקף כספי](docs/regulation-and-market-size.md)
+- 🧩 ["מגיע לי": ניתוח מתחרים ואיפיון UI/UX](docs/magia-li-competitors-and-ux.md)
 - 🧭 [בחינת רעיונות והמלצה](docs/idea-evaluation.md)
 - 📄 [איפיון מוצר ותחקיר (UI/UX), גרסה ראשונה](docs/product-spec.md)
