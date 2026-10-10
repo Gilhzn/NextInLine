@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsup src/index.ts --format esm --target node22 --clean --sourcemap",
+    "build": "tsup",
     "migrate": "tsx --env-file-if-exists=.env src/migrateCli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate:prod": "node dist/migrateCli.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
