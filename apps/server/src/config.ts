@@ -46,6 +46,11 @@ const configSchema = z
     S3_REGION: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
+    SENTRY_DSN: z.string().url().optional(),
+    SENTRY_ENVIRONMENT: z.string().optional(),
+    /** Build identifier shown in error reports (Render sets RENDER_GIT_COMMIT). */
+    RELEASE: z.string().optional(),
+    RENDER_GIT_COMMIT: z.string().optional(),
   })
   .refine((c) => !(c.NODE_ENV === "production" && c.OTP_DEV_CODE), {
     message: "OTP_DEV_CODE must not be set in production",
@@ -67,6 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ...c,
     // Explicit value wins; on Render use its public URL; when the server also serves the web app, links can be relative.
     PUBLIC_BASE_URL: c.PUBLIC_BASE_URL ?? c.RENDER_EXTERNAL_URL ?? (c.WEB_DIR ? "" : "http://localhost:4000"),
+    RELEASE: c.RELEASE ?? c.RENDER_GIT_COMMIT,
     extractionProvider: c.EXTRACTION_PROVIDER ?? (c.ANTHROPIC_API_KEY ? "claude" : "manual"),
   };
 }

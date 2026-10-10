@@ -17,7 +17,7 @@
     "android": {
       "package": "il.co.magiali.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4F1",
+        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,12 +27,32 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "מגיע לי",
+      "shortName": "מגיע לי",
+      "themeColor": "#0F766E",
+      "backgroundColor": "#F8FAFC",
+      "description": "צלמו קבלה רפואית וקבלו את ההחזר מהשב\"ן ומהביטוח"
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#F8FAFC"
+        }
+      ],
       "expo-secure-store",
-      ["expo-localization", { "supportsRTL": true, "forcesRTL": true }],
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -41,7 +61,13 @@
           "microphonePermission": false
         }
       ],
-      ["expo-notifications", { "color": "#0F766E" }]
+      [
+        "expo-notifications",
+        {
+          "color": "#0F766E"
+        }
+      ],
+      "@sentry/react-native/expo"
     ],
     "extra": {
       "router": {}

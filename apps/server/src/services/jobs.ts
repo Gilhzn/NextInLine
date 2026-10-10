@@ -1,6 +1,7 @@
 import { hostname } from "node:os";
 import type { Deps } from "../context";
 import type { Db } from "../db";
+import { captureError } from "../monitoring";
 
 export type JobType =
   | "extract_receipt"
@@ -80,7 +81,10 @@ export async function runDueJobs(deps: Deps, opts: { limit?: number; workerId?: 
         UPDATE jobs SET attempts = ${attempts}, last_error = ${message.slice(0, 1000)}, locked_at = NULL,
                run_at = ${permanent ? deps.now() : nextRun}, failed_at = ${permanent ? deps.now() : null}
         WHERE id = ${job.id}`;
-      if (permanent) await onJobFailedPermanently(deps, job, message);
+      if (permanent) {
+        captureError(error, { tags: { job: job.type } });
+        await onJobFailedPermanently(deps, job, message);
+      }
     }
   }
   return jobs.length;
@@ -110,6 +114,7 @@ export function startWorker(deps: Deps): { stop: () => Promise<void> } {
         if (n === 0) await new Promise((r) => setTimeout(r, deps.config.WORKER_POLL_MS));
       } catch (error) {
         console.error("worker tick failed", error);
+        captureError(error, { tags: { phase: "worker" } });
         await new Promise((r) => setTimeout(r, deps.config.WORKER_POLL_MS));
       }
     }

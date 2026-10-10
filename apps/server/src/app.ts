@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Deps } from "./context";
 import { AppError } from "./errors";
+import { captureError } from "./monitoring";
 import { adminRoutes } from "./routes/admin";
 import { opsRoutes } from "./routes/ops";
 import { publicRoutes } from "./routes/public";
@@ -47,6 +48,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
       return reply.code(err.statusCode).send({ error: { code: "validation_error", message: err.message ?? "בקשה לא תקינה" } });
     }
     req.log.error(error);
+    captureError(error, { userId: req.auth?.userId, tags: { route: req.routeOptions.url ?? "unknown" } });
     return reply.code(500).send({ error: { code: "internal", message: "משהו השתבש. נסה שוב" } });
   });
 

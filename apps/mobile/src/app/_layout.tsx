@@ -8,6 +8,9 @@ import { useAuth } from "../state/auth";
 import { colors } from "../theme";
 import { ApiError } from "../api/client";
 import { Loading } from "../ui";
+import { initMonitoring, wrapRoot } from "../lib/monitoring";
+
+initMonitoring();
 
 // Hebrew-first app: native builds are forced RTL via the expo-localization plugin; this covers Expo Go.
 if (Platform.OS !== "web" && !I18nManager.isRTL) {
@@ -28,7 +31,7 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function RootLayout() {
+function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const accessToken = useAuth((s) => s.accessToken);
   const hydrated = useAuth((s) => s.hydrated);
@@ -67,3 +70,5 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+export default wrapRoot(RootLayout);

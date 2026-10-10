@@ -1,0 +1,23 @@
+<!-- "מגיע לי" mark: a medical receipt and the ₪ coming back. Source for every app icon size (scripts/brand-assets.mjs). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(-22 0)">
+  <path d="M270 200 H590 A40 40 0 0 1 630 240 V760 L605.0 726 L580.0 760 L555.0 726 L530.0 760 L505.0 726 L480.0 760 L455.0 726 L430.0 760 L405.0 726 L380.0 760 L355.0 726 L330.0 760 L305.0 726 L280.0 760 L255.0 726 L230.0 760 V240 A40 40 0 0 1 270 200 Z" fill="#FFFFFF"/>
+  <!-- medical cross -->
+  <path d="M310 290 h36 v-36 h44 v36 h36 v44 h-36 v36 h-44 v-36 h-36 z" fill="#14B8A6"/>
+  <rect x="290" y="430" width="260" height="30" rx="15" fill="#99D5CC"/>
+  <rect x="290" y="500" width="200" height="30" rx="15" fill="#99D5CC"/>
+  <rect x="290" y="570" width="150" height="30" rx="15" fill="#99D5CC"/>
+  <circle cx="660" cy="680" r="170" fill="url(#coin)" stroke="#FFFFFF" stroke-width="24"/>
+  <!-- ₪ drawn as strokes so it renders the same everywhere -->
+  <g fill="none" stroke="#7C2D12" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" transform="translate(660 680) scale(1.15) translate(-640 -701)">
+    <path d="M572 772 V636 H662 V728"/>
+    <path d="M618 672 V766 H708 V630"/>
+  </g>
+</g>
+</svg>
