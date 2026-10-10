@@ -10,9 +10,14 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "dev:server": "npm run dev -w @magiali/server",
-    "dev:mobile": "npm run start -w @magiali/mobile"
+    "dev:mobile": "npm run start -w @magiali/mobile",
+    "demo": "bash scripts/demo.sh",
+    "e2e": "node e2e/flow.mjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
   }
 }

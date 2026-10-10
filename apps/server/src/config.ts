@@ -11,7 +11,8 @@ const configSchema = z
     PORT: z.coerce.number().int().default(4000),
     HOST: z.string().default("0.0.0.0"),
     DATABASE_URL: z.string().url(),
-    PUBLIC_BASE_URL: z.string().url().default("http://localhost:4000"),
+    /** Base for signed file links. Empty = relative links (web app served from the same origin). */
+    PUBLIC_BASE_URL: z.union([z.literal(""), z.string().url()]).default("http://localhost:4000"),
     JWT_SECRET: z.string().min(32),
     OTP_PEPPER: z.string().min(16),
     MASTER_KEY: base64Key,
@@ -29,6 +30,8 @@ const configSchema = z
     /** Per-IP limits on login codes. Raised in tests, where every request shares one address. */
     OTP_MAX_PER_IP_HOUR: z.coerce.number().int().positive().default(20),
     OTP_ROUTE_LIMIT_PER_10MIN: z.coerce.number().int().positive().default(10),
+    /** Optional: directory of the exported web app to serve from the same origin (demo / preview). */
+    WEB_DIR: z.string().optional(),
   })
   .refine((c) => !(c.NODE_ENV === "production" && c.OTP_DEV_CODE), {
     message: "OTP_DEV_CODE must not be set in production",

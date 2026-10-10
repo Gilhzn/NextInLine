@@ -2,7 +2,9 @@ import { Platform } from "react-native";
 import type { ApiErrorBody } from "@magiali/shared";
 import { useAuth } from "../state/auth";
 
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const configured = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+/** "same-origin": the web build is served by the API server itself (demo / Codespaces / CI). */
+export const API_URL = configured === "same-origin" ? "" : configured.replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(

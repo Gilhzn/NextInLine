@@ -1,0 +1,15 @@
+{
+  "name": "מגיע לי – הדגמה",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "forwardPorts": [4000],
+  "portsAttributes": {
+    "4000": { "label": "מגיע לי (אפליקציה + שרת)", "onAutoForward": "openBrowser" }
+  },
+  "postCreateCommand": "npm ci",
+  "postAttachCommand": "npm run demo",
+  "customizations": {
+    "codespaces": { "openFiles": ["README.md"] }
+  }
+}

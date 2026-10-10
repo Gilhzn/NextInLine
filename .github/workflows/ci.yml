@@ -2,11 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
+    name: Typecheck, tests, build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -36,3 +38,52 @@ jobs:
         run: npm test
       - name: Build server
         run: npm run build -w @magiali/server
+
+  e2e:
+    name: Run the app and walk through it (screenshots)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: magiali
+          POSTGRES_PASSWORD: magiali
+          POSTGRES_DB: magiali
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U magiali"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://magiali:magiali@localhost:5432/magiali
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Start the server with the app (same origin)
+        run: |
+          nohup npm run demo > demo.log 2>&1 &
+          for i in $(seq 1 150); do
+            if curl -sf http://localhost:4000/health > /dev/null; then echo "app is up"; exit 0; fi
+            sleep 2
+          done
+          echo "app did not start"; tail -50 demo.log; exit 1
+      - name: Walk through the app
+        run: npm run e2e
+        env:
+          OUT_DIR: e2e/screenshots
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshots
+          path: |
+            e2e/screenshots/*.png
+            demo.log
+          if-no-files-found: warn
