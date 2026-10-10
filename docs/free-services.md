@@ -21,7 +21,7 @@ services: sms=twilio · email=console (dev) · storage=s3 (receipts) · payments
 | מסד נתונים | **Neon** | 0.5GB, בלי תאריך תפוגה | `DATABASE_URL=...?sslmode=require` |
 | התראות Push | **Expo Push** | חינם | אין (מובנה) |
 | ניטור שגיאות | Sentry | 5,000 שגיאות בחודש | (לא מחובר עדיין) |
-| סליקה | Grow / PayPlus / Cardcom | סביבות בדיקה בלבד | (מדומה, ראו למטה) |
+| סליקה | **Cardcom** (מחובר בקוד) | מסוף בדיקות 1000 בחינם. בייצור: עמלת סליקה | `CARDCOM_TERMINAL_NUMBER`, `CARDCOM_API_NAME`, `CARDCOM_API_PASSWORD`, `CARDCOM_DOCUMENT_TYPE` |
 | קריאת קבלות ב-AI | Anthropic (Claude) | **בתשלום**, לפי שימוש | `ANTHROPIC_API_KEY` |
 
 ## SMS
@@ -54,6 +54,7 @@ services: sms=twilio · email=console (dev) · storage=s3 (receipts) · payments
 ## אחסון קבלות: Cloudflare R2
 **למה צריך את זה ב-Render:** הדיסק של שירות חינמי ב-Render נמחק בכל פריסה או הפעלה מחדש, ואיתו תמונות הקבלות. R2 שומר אותן לתמיד.
 1. ב-Cloudflare → R2 → Create bucket (למשל `magiali-receipts`).
+   **חשוב לפרטיות:** בזמן יצירת הבאקט בוחרים **Jurisdiction: European Union**. אז ה-endpoint הוא `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com`.
 2. R2 → Manage API Tokens → Create token עם הרשאות Object Read & Write לבאקט.
 3. מגדירים:
    - `S3_BUCKET=magiali-receipts`
@@ -70,14 +71,26 @@ services: sms=twilio · email=console (dev) · storage=s3 (receipts) · payments
 3. ב-Render → Environment מחליפים את `DATABASE_URL` במחרוזת של Neon. היא צריכה להסתיים ב-`?sslmode=require`.
 4. השרת מריץ את המיגרציות לבד בהפעלה הראשונה.
 
-## סליקה (עמלת ההצלחה)
-הסליקה **נשארת מדומה** בהדגמה. כרטיס שמתחיל ב-`fail_` נדחה, וכל כרטיס אחר מצליח. לחיבור אמיתי בוחרים סולק ישראלי, ולכל אחד יש סביבת בדיקה:
-- **Grow (Meshulam):** כרטיסי בדיקה. ל-Bit, Apple Pay ו-Google Pay אין סביבת בדיקה: https://developers.grow.business/reference/testing-environment
-- **PayPlus:** סביבת staging: https://www.payplus.co.il/developers
-- **Cardcom:** sandbox: https://www.cardcom.solutions/developers
-- השוואה: https://otomation.io/blog/israeli-payment-gateways-api
+## סליקה: Cardcom (מחובר בקוד)
+**למה Cardcom:**
+- יש דף סליקה מאובטח עם "שמירת כרטיס בלבד" (CreateTokenOnly). מספר הכרטיס לא עובר אצלנו.
+- חיוב מאוחר של הטוקן עם מפתח שמונע חיוב כפול (`ExternalUniqTranId`).
+- קבלה או חשבונית מס-קבלה **נוצרת ונשלחת אוטומטית** עם כל חיוב.
+- החזר כספי בקריאה אחת.
+- מסוף בדיקות ציבורי, כך שאפשר לבדוק לפני שיש חשבון סוחר.
 
-הגישה לסביבת בדיקה לרוב דורשת פתיחת חשבון סוחר, אז מחברים אחרי שבוחרים סולק. בקוד מממשים את הממשק `PaymentProvider` (בקובץ `apps/server/src/providers.ts`), כלומר שמירת טוקן (tokenization) וחיוב עם idempotency key.
+השוואה מלאה ל-PayPlus ול-Grow: [docs/research/](research/). מקור השדות: ה-OpenAPI הרשמי של Cardcom v11.
+
+**לבדיקה (בחינם):**
+- `CARDCOM_TERMINAL_NUMBER=1000`. את שם ה-API של מסוף הבדיקות מבקשים מהתמיכה של Cardcom. בדוגמאות של Cardcom מופיע `CardTest1994`, אבל הוא מתחלף מדי פעם.
+- כרטיס בדיקה: `4580000000000000`, תוקף עתידי כלשהו, CVV `123`.
+- במסוף הבדיקות כרטיסים לא מחויבים באמת. השרת מסרב לרוץ בייצור עם מסוף 1000.
+
+**לייצור:**
+1. פותחים חשבון סוחר ב-Cardcom (צריך עוסק מורשה, עוסק פטור או חברה) ומבקשים **הרשאת טוקנים** ו**ממשק API**.
+2. מגדירים `CARDCOM_TERMINAL_NUMBER`, `CARDCOM_API_NAME` ו-`CARDCOM_API_PASSWORD` (הסיסמה נדרשת רק להחזרים).
+3. `CARDCOM_DOCUMENT_TYPE`: **`Receipt`** לעוסק פטור (אסור לו להוציא חשבונית מס), או **`TaxInvoiceAndReceipt`** לעוסק מורשה או חברה.
+4. **בלי Cardcom, ובסביבת ההדגמה:** השרת מציג דף סליקה מדומה בכתובת `/payments/mock/...`, עם אותה זרימה בדיוק. כרטיס שמתחיל ב-`4000000000000002` נדחה.
 
 ## Anthropic (קריאת קבלות)
 בתשלום לפי שימוש. בלי מפתח, המשתמש מקליד את פרטי הקבלה בעצמו והזרימה עובדת במלואה. עם `ANTHROPIC_API_KEY` הקבלה נקראת אוטומטית והשדות שהמודל לא בטוח בהם מסומנים.

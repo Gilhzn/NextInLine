@@ -1,0 +1,101 @@
+# Production Blueprint for "מגיע לי": real services only, no demo code, paid plans that don't sleep.
+# In Render: New → Blueprint → this repo → Blueprint file path: render.production.yaml
+# The server refuses to start until every required value below is filled in (docs/production.md).
+
+databases:
+  - name: magiali-prod-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: magiali
+    user: magiali
+
+services:
+  - type: web
+    name: magiali-prod
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @magiali/server &&
+      cd apps/mobile &&
+      EXPO_NO_TELEMETRY=1 EXPO_PUBLIC_API_URL=same-origin npx expo export --platform web --output-dir dist
+    startCommand: cd apps/server && node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: ROLE
+        value: all
+      - key: WEB_DIR
+        value: ../mobile/dist
+      - key: DATABASE_URL
+        fromDatabase:
+          name: magiali-prod-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_PEPPER
+        generateValue: true
+      - key: MASTER_KEY
+        generateValue: true
+      - key: FILES_SIGNING_SECRET
+        generateValue: true
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # Your own domain, e.g. https://app.magiali.co.il (optional; Render's URL is used otherwise)
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # --- Operators (mobile numbers, comma separated) ---
+      - key: OPS_PHONES
+        sync: false
+      # --- Business and privacy details (terms, privacy policy, power of attorney) ---
+      - key: LEGAL_ENTITY_NAME
+        sync: false
+      - key: LEGAL_ENTITY_ID
+        sync: false
+      - key: LEGAL_ADDRESS
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false
+      - key: DPO_NAME
+        sync: false
+      - key: DPO_EMAIL
+        sync: false
+      # --- SMS (Twilio) ---
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      # --- Email (Resend) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # --- Receipt storage (Cloudflare R2, EU jurisdiction) ---
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      # --- Payments (Cardcom). DOCUMENT_TYPE: Receipt (עוסק פטור) or TaxInvoiceAndReceipt (מורשה/חברה) ---
+      - key: CARDCOM_TERMINAL_NUMBER
+        sync: false
+      - key: CARDCOM_API_NAME
+        sync: false
+      - key: CARDCOM_API_PASSWORD
+        sync: false
+      - key: CARDCOM_DOCUMENT_TYPE
+        sync: false
+      # --- Recommended ---
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
