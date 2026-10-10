@@ -1,0 +1,18 @@
+{
+  "name": "magiali",
+  "private": true,
+  "description": "מגיע לי – צלם קבלה ותקבל כסף",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:server": "npm run dev -w @magiali/server",
+    "dev:mobile": "npm run start -w @magiali/mobile"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
