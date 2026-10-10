@@ -1,0 +1,65 @@
+import { useEffect } from "react";
+import { I18nManager, Platform } from "react-native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useAuth } from "../state/auth";
+import { colors } from "../theme";
+import { ApiError } from "../api/client";
+
+// Hebrew-first app: native builds are forced RTL via the expo-localization plugin; this covers Expo Go.
+if (Platform.OS !== "web" && !I18nManager.isRTL) {
+  I18nManager.allowRTL(true);
+  I18nManager.forceRTL(true);
+}
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  document.documentElement.dir = "rtl";
+  document.documentElement.lang = "he";
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: (count, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && count < 2,
+    },
+  },
+});
+
+export default function RootLayout() {
+  const hydrate = useAuth((s) => s.hydrate);
+  const accessToken = useAuth((s) => s.accessToken);
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  // Signing out (or a failed refresh) drops every cached query.
+  useEffect(() => {
+    if (!accessToken) queryClient.clear();
+  }, [accessToken]);
+
+  return (
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.primary,
+            headerBackTitle: "חזרה",
+          }}
+        >
+          <Stack.Screen name="receipt/[id]" options={{ headerShown: true, title: "בדיקת קבלה" }} />
+          <Stack.Screen name="claim/[id]" options={{ headerShown: true, title: "התביעה" }} />
+          <Stack.Screen name="pack/[claimId]/[legId]" options={{ headerShown: true, title: "תיק מוכן להגשה" }} />
+          <Stack.Screen name="member/[id]" options={{ headerShown: true, title: "בן משפחה" }} />
+          <Stack.Screen name="member/new" options={{ headerShown: true, title: "הוספת בן משפחה" }} />
+          <Stack.Screen name="settings" options={{ headerShown: true, title: "הגדרות" }} />
+        </Stack>
+      </QueryClientProvider>
+    </SafeAreaProvider>
+  );
+}

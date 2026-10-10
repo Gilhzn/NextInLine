@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "מגיע לי",
+    "slug": "magiali",
+    "scheme": "magiali",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "il.co.magiali.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "il.co.magiali.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4F1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-localization", { "supportsRTL": true, "forcesRTL": true }],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "כדי לבחור קבלות רפואיות מהגלריה ולבקש עבורן החזר.",
+          "cameraPermission": "כדי לצלם קבלות רפואיות ולבקש עבורן החזר.",
+          "microphonePermission": false
+        }
+      ],
+      ["expo-notifications", { "color": "#0F766E" }]
+    ],
+    "extra": {
+      "router": {}
+    }
+  }
+}

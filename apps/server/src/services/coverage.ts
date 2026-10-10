@@ -25,7 +25,8 @@ export async function loadRoutingEnrollments(db: Db, memberId: string, catalogVe
     JOIN plans p ON p.id = e.plan_id
     LEFT JOIN benefits b ON b.plan_id = e.plan_id AND b.catalog_version = ${catalogVersion}
     WHERE e.member_id = ${memberId}
-    GROUP BY e.id, p.id`;
+    GROUP BY e.id, p.id
+    ORDER BY CASE p.plan_kind WHEN 'shaban' THEN 0 WHEN 'private_individual' THEN 1 ELSE 2 END, e.is_shaban_supplement DESC, p.id`;
   return rows.map((r) => {
     const raw = r.benefits as Record<string, unknown>;
     const benefits: Partial<Record<BenefitCategory, BenefitRule>> = {};

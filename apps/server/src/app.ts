@@ -22,7 +22,11 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   });
 
   await app.register(helmet, { contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: "cross-origin" } });
-  await app.register(cors, { origin: deps.config.NODE_ENV === "production" ? false : true });
+  await app.register(cors, {
+    // Native apps don't use CORS; this serves the web preview build in development.
+    origin: deps.config.NODE_ENV === "production" ? false : true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
   await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
   await app.register(multipart);
 
