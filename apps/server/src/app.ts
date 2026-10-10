@@ -6,6 +6,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Deps } from "./context";
 import { AppError } from "./errors";
 import { adminRoutes } from "./routes/admin";
+import { opsRoutes } from "./routes/ops";
 import { publicRoutes } from "./routes/public";
 import { userRoutes } from "./routes/user";
 import { webRoutes } from "./routes/web";
@@ -54,6 +55,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   await app.register(async (scope) => publicRoutes(scope, deps));
   await app.register(async (scope) => userRoutes(scope, deps), { prefix: "/v1" });
   await app.register(async (scope) => adminRoutes(scope, deps), { prefix: "/admin" });
+  await app.register(async (scope) => opsRoutes(scope));
   if (deps.config.WEB_DIR) {
     const webDir = deps.config.WEB_DIR;
     await app.register(async (scope) => webRoutes(scope, webDir));

@@ -9,8 +9,11 @@ export type Tx = postgres.TransactionSql<Record<string, unknown>>;
 export type Db = Sql | Tx;
 
 export function createSql(url: string, options: { max?: number } = {}): Sql {
+  // Managed providers (Neon, Supabase, Render external URLs) require TLS; honour sslmode in the URL.
+  const sslmode = new URL(url).searchParams.get("sslmode");
   return postgres(url, {
     max: options.max ?? 10,
+    ssl: sslmode === "require" || sslmode === "verify-full" ? "require" : undefined,
     onnotice: () => {},
     transform: { column: { from: postgres.toCamel } },
     types: {

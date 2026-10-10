@@ -1,0 +1,88 @@
+import { formatILS } from "@magiali/shared";
+import type { Deps } from "../context";
+import { enqueue, registerJobHandler } from "./jobs";
+import { notify } from "./notify";
+
+/** Conservative claim window: policies issued before 11/2020 allow 3 years (newer ones 5). */
+const CLAIM_WINDOW_YEARS = 3;
+const WARN_DAYS = [60, 14];
+
+/** Makes sure exactly one daily maintenance run is scheduled. Safe to call on every boot. */
+export async function ensureDailyMaintenance(deps: Deps): Promise<void> {
+  const [pending] = await deps.sql`
+    SELECT 1 FROM jobs WHERE type = 'daily_maintenance' AND done_at IS NULL AND failed_at IS NULL LIMIT 1`;
+  if (!pending) await enqueue(deps.sql, "daily_maintenance", {}, { runAt: deps.now() });
+}
+
+function nextMorning(now: Date): Date {
+  // 06:00 UTC ≈ 08:00–09:00 in Israel, right after quiet hours.
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 6, 0, 0));
+  return next;
+}
+
+async function alreadyNotified(deps: Deps, userId: string, type: string, key: string): Promise<boolean> {
+  const [row] = await deps.sql`
+    SELECT 1 FROM notifications WHERE user_id = ${userId} AND type = ${type} AND data->>'key' = ${key} LIMIT 1`;
+  return !!row;
+}
+
+/** Receipts that were never claimed and are approaching the end of the claim window. */
+export async function warnExpiringReceipts(deps: Deps): Promise<number> {
+  const now = deps.now();
+  let sent = 0;
+  for (const days of WARN_DAYS) {
+    const rows = await deps.sql`
+      SELECT r.id, r.amount_agorot, r.service_date, h.owner_user_id
+      FROM receipts r JOIN households h ON h.id = r.household_id
+      WHERE r.deleted_at IS NULL AND r.service_date IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM claim_receipts cr JOIN claims c ON c.id = cr.claim_id
+                        WHERE cr.receipt_id = r.id AND c.status <> 'cancelled')
+        AND r.service_date + make_interval(years => ${CLAIM_WINDOW_YEARS}) BETWEEN ${now}::date
+            AND ${now}::date + ${days}::int`;
+    for (const r of rows) {
+      const key = `${r.id as string}:${days}`;
+      if (await alreadyNotified(deps, r.ownerUserId as string, "expiry_warning", key)) continue;
+      await notify(deps.sql, now, r.ownerUserId as string, {
+        type: "expiry_warning",
+        title: `⏰ קבלה${r.amountAgorot ? ` של ${formatILS(r.amountAgorot as number)}` : ""} תפוג בעוד פחות מ-${days} יום`,
+        body: "אחרי זה כבר אי אפשר לתבוע עליה. להגיש עכשיו?",
+        data: { receiptId: r.id, key },
+      });
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** Legs waiting longer than the payer's usual processing time get one nudge. */
+export async function nudgeSlowPayers(deps: Deps): Promise<number> {
+  const now = deps.now();
+  const rows = await deps.sql`
+    SELECT l.id, l.claim_id, p.name_he AS payer_name, l.expected_agorot, h.owner_user_id
+    FROM claim_legs l JOIN payers p ON p.id = l.payer_id JOIN claims c ON c.id = l.claim_id
+    JOIN households h ON h.id = c.household_id
+    WHERE l.status IN ('submitted', 'received', 'in_review') AND l.submitted_at IS NOT NULL
+      AND l.submitted_at + make_interval(days => p.avg_processing_days) < ${now}`;
+  let sent = 0;
+  for (const l of rows) {
+    const key = l.id as string;
+    if (await alreadyNotified(deps, l.ownerUserId as string, "slow_payer", key)) continue;
+    await notify(deps.sql, now, l.ownerUserId as string, {
+      type: "slow_payer",
+      title: `${l.payerName as string} מתעכבים עם התשובה`,
+      body: `עבר הזמן הרגיל לטיפול (${formatILS(l.expectedAgorot as number)}). אפשר לפנות אליהם עם מספר הפנייה, או לעדכן אותנו אם הכסף הגיע`,
+      data: { claimId: l.claimId, key },
+    });
+    sent++;
+  }
+  return sent;
+}
+
+registerJobHandler("daily_maintenance", async (deps) => {
+  try {
+    await warnExpiringReceipts(deps);
+    await nudgeSlowPayers(deps);
+  } finally {
+    await enqueue(deps.sql, "daily_maintenance", {}, { runAt: nextMorning(deps.now()) });
+  }
+});

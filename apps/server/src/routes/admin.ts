@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { adminLegStatusSchema, BENEFIT_CATEGORIES, LEG_STATUSES } from "@magiali/shared";
+import { adminLegStatusSchema, BENEFIT_CATEGORIES, CATEGORY_INFO, LEG_STATUSES, type BenefitCategory } from "@magiali/shared";
 import { publishCatalogVersion } from "../catalog";
 import type { Deps } from "../context";
 import { safeEqualHex, sha256Hex } from "../crypto";
@@ -20,13 +20,28 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
   });
 
   app.get<{ Querystring: { status?: string } }>("/legs", async (req) => {
-    const { status } = parse(z.object({ status: z.enum(LEG_STATUSES).optional() }), req.query);
-    return deps.sql`
-      SELECT l.id, l.claim_id, l.seq, l.status, l.payer_id, l.expected_agorot, l.submitted_at, l.submission_channel,
-             c.category, c.amount_agorot, c.service_date, m.full_name AS member_name
+    const statuses = (req.query.status ?? "").split(",").filter(Boolean);
+    parse(z.array(z.enum(LEG_STATUSES)), statuses);
+    const rows = await deps.sql`
+      SELECT l.id, l.claim_id, l.seq, l.status, l.payer_id, p.name_he AS payer_name, l.expected_agorot, l.approved_agorot,
+             l.paid_agorot, l.submitted_at, l.submission_channel, l.updated_at,
+             c.category, c.amount_agorot, c.service_date, c.provider_name, c.status AS claim_status,
+             m.full_name AS member_name, u.phone_e164 AS owner_phone
       FROM claim_legs l JOIN claims c ON c.id = l.claim_id JOIN members m ON m.id = c.member_id
-      WHERE (${status ?? null}::text IS NULL OR l.status = ${status ?? null})
-      ORDER BY l.updated_at LIMIT 200`;
+      JOIN payers p ON p.id = l.payer_id JOIN households h ON h.id = c.household_id JOIN users u ON u.id = h.owner_user_id
+      WHERE (${statuses.length === 0} OR l.status IN ${deps.sql(statuses.length ? statuses : ["-"])})
+      ORDER BY l.updated_at DESC LIMIT 200`;
+    return rows.map((r) => ({ ...r, categoryLabel: CATEGORY_INFO[r.category as BenefitCategory]?.label ?? r.category }));
+  });
+
+  app.get("/overview", async () => {
+    const [users] = await deps.sql`SELECT count(*)::int AS n FROM users WHERE deleted_at IS NULL`;
+    const claims = await deps.sql`SELECT status, count(*)::int AS n FROM claims GROUP BY status`;
+    const legs = await deps.sql`SELECT status, count(*)::int AS n FROM claim_legs GROUP BY status`;
+    const fees = await deps.sql`SELECT status, count(*)::int AS n, COALESCE(sum(amount_agorot), 0)::int AS agorot FROM fees GROUP BY status`;
+    const [paid] = await deps.sql`SELECT COALESCE(sum(paid_agorot), 0)::int AS agorot FROM claim_legs WHERE status = 'paid'`;
+    const [failedJobs] = await deps.sql`SELECT count(*)::int AS n FROM jobs WHERE failed_at IS NOT NULL`;
+    return { users: users!.n, paidToUsersAgorot: paid!.agorot, failedJobs: failedJobs!.n, claims, legs, fees };
   });
 
   app.post<{ Params: { id: string } }>("/legs/:id/status", async (req) => {
@@ -45,11 +60,15 @@ export async function adminRoutes(app: FastifyInstance, deps: Deps): Promise<voi
     return leg;
   });
 
-  app.get("/fees/disputed", async () => deps.sql`SELECT * FROM fees WHERE status IN ('disputed', 'failed') ORDER BY updated_at`);
+  app.get("/fees", async () =>
+    deps.sql`
+      SELECT f.*, u.phone_e164 AS owner_phone FROM fees f JOIN households h ON h.id = f.household_id
+      JOIN users u ON u.id = h.owner_user_id ORDER BY f.updated_at DESC LIMIT 200`,
+  );
 
   app.post<{ Params: { id: string } }>("/fees/:id/resolve", async (req) => {
     const { id } = parse(z.object({ id: z.uuid() }), req.params);
-    const { action } = parse(z.object({ action: z.enum(["charge", "waive"]) }), req.body);
+    const { action } = parse(z.object({ action: z.enum(["charge", "waive", "charge_now"]) }), req.body);
     return resolveFee(deps, id, action);
   });
 

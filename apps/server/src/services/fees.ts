@@ -24,9 +24,18 @@ export async function disputeFee(deps: Deps, ctx: AuthContext, feeId: string, re
   return feeDto(updated!);
 }
 
-export async function resolveFee(deps: Deps, feeId: string, action: "charge" | "waive"): Promise<FeeDto> {
+export async function resolveFee(deps: Deps, feeId: string, action: "charge" | "waive" | "charge_now"): Promise<FeeDto> {
   const [fee] = await deps.sql`SELECT * FROM fees WHERE id = ${feeId}`;
   if (!fee) throw notFound("העמלה");
+  if (action === "charge_now") {
+    // Operations / demo: skip the 3-day wait for a scheduled fee.
+    if (fee.status !== "scheduled") throw new AppError("conflict", "אפשר לחייב מיד רק עמלה מתוזמנת");
+    await deps.sql`UPDATE fees SET scheduled_for = ${deps.now()}, updated_at = ${deps.now()} WHERE id = ${feeId}`;
+    await chargeFee(deps, feeId);
+    const [after] = await deps.sql`SELECT * FROM fees WHERE id = ${feeId}`;
+    await audit(deps.sql, { actorKind: "ops", action: "fee_charged_now", entity: "fee", entityId: feeId });
+    return feeDto(after!);
+  }
   if (fee.status !== "disputed" && fee.status !== "failed") throw new AppError("conflict", "אפשר להכריע רק בעמלה במחלוקת או שנכשלה");
   if (action === "waive") {
     const [updated] = await deps.sql`UPDATE fees SET status = 'waived', updated_at = ${deps.now()} WHERE id = ${feeId} RETURNING *`;

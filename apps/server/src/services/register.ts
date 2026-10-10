@@ -4,3 +4,4 @@ import "./receipts";
 import "./claims";
 import "./fees";
 import "./privacy";
+import "./maintenance";

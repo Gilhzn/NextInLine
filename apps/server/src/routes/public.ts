@@ -14,6 +14,12 @@ export async function publicRoutes(app: FastifyInstance, deps: Deps): Promise<vo
     return { ok: true, version: process.env.npm_package_version ?? "dev" };
   });
 
+  // Lets the app show a "demo environment" banner and the fixed login code when one is configured.
+  app.get("/v1/public-config", async () => ({
+    demoMode: !!deps.config.OTP_DEV_CODE,
+    demoLoginCode: deps.config.OTP_DEV_CODE ?? null,
+  }));
+
   const otpLimit = { config: { rateLimit: { max: deps.config.OTP_ROUTE_LIMIT_PER_10MIN, timeWindow: "10 minutes" } } };
 
   app.post("/v1/auth/otp/request", otpLimit, async (req, reply) => {

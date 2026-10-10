@@ -9,7 +9,9 @@ export type NotificationType =
   | "leg_rejected"
   | "fee_upcoming"
   | "fee_failed"
-  | "claim_submitted";
+  | "claim_submitted"
+  | "expiry_warning"
+  | "slow_payer";
 
 const QUIET_START = 21;
 const QUIET_END = 8;
