@@ -4,9 +4,10 @@ import type { AuthContext, Deps } from "../context";
 import { hmacHex, sha256Hex } from "../crypto";
 import type { Db } from "../db";
 import { AppError, notFound } from "../errors";
-import { EXTRACTABLE_MIME_TYPES, RetryableExtractionError, type ExtractableMime } from "../extraction";
+import { EXTRACTABLE_MIME_TYPES, ManualExtractor, RetryableExtractionError, type ExtractableMime } from "../extraction";
 import { iso } from "../http";
 import { audit } from "./audit";
+import { hasConsent, requireConsent } from "./consents";
 import { getMemberForHousehold, listMembers } from "./households";
 import { enqueue, PermanentJobError, registerJobFailureHook, registerJobHandler } from "./jobs";
 import { notify } from "./notify";
@@ -26,6 +27,7 @@ export async function storeDocument(
   ctx: AuthContext,
   input: { data: Buffer; mimeType: string; kind: StoredDocKind; memberId?: string | null },
 ): Promise<{ id: string; sha256: string }> {
+  await requireConsent(deps.sql, ctx.userId, "medical_data");
   if (!(EXTRACTABLE_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
     throw new AppError("unsupported_media_type", "אפשר להעלות תמונה (JPG/PNG/WEBP) או PDF");
   }
@@ -77,6 +79,8 @@ export async function uploadReceipt(
   return getReceipt(deps, ctx, receipt!.id as string);
 }
 
+const MANUAL = new ManualExtractor();
+
 type ReceiptRow = {
   id: string;
   documentId: string;
@@ -90,6 +94,8 @@ type ReceiptRow = {
   amountAgorot: number | null;
   sessions: number;
   createdAt: Date;
+  /** false once the image was deleted under the retention policy */
+  fileAvailable: boolean;
 };
 
 function toDto(deps: Deps, r: ReceiptRow): ReceiptDto {
@@ -104,7 +110,7 @@ function toDto(deps: Deps, r: ReceiptRow): ReceiptDto {
     serviceDate: r.serviceDate,
     amountAgorot: r.amountAgorot,
     sessions: r.sessions,
-    imageUrl: signedFileUrl(deps, r.documentId),
+    imageUrl: r.fileAvailable ? signedFileUrl(deps, r.documentId) : null,
     createdAt: iso(r.createdAt)!,
   };
 }
@@ -112,7 +118,8 @@ function toDto(deps: Deps, r: ReceiptRow): ReceiptDto {
 export async function getReceipt(deps: Deps, ctx: AuthContext, receiptId: string): Promise<ReceiptDto> {
   const [r] = await deps.sql`
     SELECT id, document_id, member_id, extraction_status, extracted, confirmed_at, category, provider_name,
-           service_date, amount_agorot, sessions, created_at
+           service_date, amount_agorot, sessions, created_at,
+           (SELECT d.deleted_at IS NULL FROM documents d WHERE d.id = receipts.document_id) AS file_available
     FROM receipts WHERE id = ${receiptId} AND household_id = ${ctx.householdId} AND deleted_at IS NULL`;
   if (!r) throw notFound("הקבלה");
   return toDto(deps, r as unknown as ReceiptRow);
@@ -121,7 +128,8 @@ export async function getReceipt(deps: Deps, ctx: AuthContext, receiptId: string
 export async function listReceipts(deps: Deps, ctx: AuthContext, filter: { unclaimedOnly?: boolean }): Promise<ReceiptDto[]> {
   const rows = await deps.sql`
     SELECT r.id, r.document_id, r.member_id, r.extraction_status, r.extracted, r.confirmed_at, r.category,
-           r.provider_name, r.service_date, r.amount_agorot, r.sessions, r.created_at
+           r.provider_name, r.service_date, r.amount_agorot, r.sessions, r.created_at,
+           (SELECT d.deleted_at IS NULL FROM documents d WHERE d.id = r.document_id) AS file_available
     FROM receipts r
     WHERE r.household_id = ${ctx.householdId} AND r.deleted_at IS NULL
       AND (${filter.unclaimedOnly ?? false} = false
@@ -192,10 +200,12 @@ registerJobHandler("extract_receipt", async (deps, payload) => {
 
   await deps.sql`UPDATE receipts SET extraction_status = 'processing' WHERE id = ${receiptId}`;
   const doc = await readDocument(deps, r.documentId as string);
+  // The receipt goes to the AI provider (abroad) only with the user's explicit, separate consent.
+  const extractor = (await hasConsent(deps.sql, r.ownerUserId as string, "ai_processing")) ? deps.extractor : MANUAL;
 
   let fields: ExtractedFields;
   try {
-    fields = await deps.extractor.extract({ data: doc.data, mimeType: doc.mimeType as ExtractableMime });
+    fields = await extractor.extract({ data: doc.data, mimeType: doc.mimeType as ExtractableMime });
   } catch (error) {
     if (error instanceof RetryableExtractionError) throw error;
     throw new PermanentJobError(error instanceof Error ? error.message : "extraction failed");
@@ -203,7 +213,7 @@ registerJobHandler("extract_receipt", async (deps, payload) => {
 
   const members = await listMembers(deps.sql, r.householdId as string);
   const memberId = (r.memberId as string | null) ?? guessMember(members, fields.patientName);
-  const status = deps.extractor.name === "manual" ? "manual" : "done";
+  const status = extractor.name === "manual" ? "manual" : "done";
 
   await deps.sql`
     UPDATE receipts SET

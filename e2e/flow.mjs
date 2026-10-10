@@ -72,6 +72,7 @@ await vis(page.getByLabel("השם שלך")).fill("מיכל כהן");
 await click("הוספת בן משפחה");
 await vis(page.getByLabel("שם", { exact: true })).fill("נועה");
 await vis(page.getByLabel("תאריך לידה")).fill("2020-05-01");
+await vis(page.getByRole("checkbox", { name: "אני ההורה או האפוטרופוס" })).click();
 await click("הוספה");
 await see("ילד/ה");
 await shot("family");
@@ -90,6 +91,13 @@ await shot("coverage-map");
 await click("יש לי קבלות? בוא נמצא כסף");
 
 await see("איפה הקבלות שלך?");
+// Before the first medical document: the privacy notice and separate, unticked consents.
+await see("לפני שמעלים קבלות");
+for (const name of ["תנאי השימוש", "מדיניות הפרטיות", "עיבוד מידע רפואי"]) {
+  await vis(page.getByRole("checkbox", { name })).click();
+}
+await shot("consents");
+await click("מסכים/ה, אפשר להמשיך");
 const chooser = page.waitForEvent("filechooser");
 await click("בחר מהגלריה");
 await (await chooser).setFiles(receiptPath);
@@ -108,7 +116,7 @@ await page.getByRole("button", { name: "שמירת הכרטיס" }).click();
 await see("הכרטיס נשמר");
 await see("כמעט סיימנו");
 await see("אמצעי תשלום נשמר");
-await vis(page.getByRole("checkbox")).first().click();
+await see("✓ עיבוד מידע רפואי");
 await shot("agreements");
 await click("סיימנו, בוא נתחיל");
 
@@ -194,6 +202,12 @@ await page.goto(`${BASE_URL}/settings`);
 await see("עמלות הצלחה");
 await see("חויבה");
 await shot("settings-fees");
+
+for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
+  await page.goto(`${BASE_URL}/legal/${doc}`);
+  await see(text);
+}
+await shot("privacy-policy");
 
 await page.goto(`${BASE_URL}/benefits`);
 await vis(page.getByLabel("חיפוש")).fill("פסיכולוג");

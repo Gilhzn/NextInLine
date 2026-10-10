@@ -78,10 +78,48 @@ export async function nudgeSlowPayers(deps: Deps): Promise<number> {
   return sent;
 }
 
+/**
+ * Data minimisation: deletes stored images (receipts, referrals, summaries) once they are no longer needed —
+ * N days after the claim closed, or when an unclaimed receipt is past the claim window. Amounts and statuses stay.
+ */
+export async function purgeExpiredFiles(deps: Deps): Promise<number> {
+  const days = deps.config.RECEIPT_RETENTION_DAYS;
+  const docs = await deps.sql`
+    SELECT d.id, d.storage_key FROM documents d
+    WHERE d.deleted_at IS NULL AND (
+      -- every claim the document belongs to is closed, and closed long enough ago
+      (EXISTS (SELECT 1 FROM claim_documents_v v WHERE v.document_id = d.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM claim_documents_v v JOIN claims c ON c.id = v.claim_id
+         WHERE v.document_id = d.id
+           AND (c.status NOT IN ('completed', 'partially_paid', 'rejected', 'cancelled')
+                OR c.updated_at > ${deps.now()}::timestamptz - make_interval(days => ${days}))))
+      OR
+      -- a receipt never claimed, past the claim window
+      EXISTS (SELECT 1 FROM receipts r WHERE r.document_id = d.id AND r.service_date IS NOT NULL
+              AND r.service_date < (${deps.now()}::timestamptz - make_interval(years => ${CLAIM_WINDOW_YEARS}))::date
+              AND NOT EXISTS (SELECT 1 FROM claim_receipts cr WHERE cr.receipt_id = r.id))
+    )
+    LIMIT 500`;
+  for (const d of docs) {
+    await deps.storage.delete(d.storageKey as string).catch(() => undefined);
+    await deps.sql`
+      UPDATE documents SET deleted_at = ${deps.now()}, storage_key = 'purged:' || id::text, wrapped_key = ''
+      WHERE id = ${d.id as string}`;
+  }
+  if (docs.length) {
+    await deps.sql`
+      INSERT INTO audit_log (actor_kind, action, entity, meta)
+      VALUES ('system', 'files_purged_by_retention', 'document', ${deps.sql.json({ count: docs.length, days } as never)})`;
+  }
+  return docs.length;
+}
+
 registerJobHandler("daily_maintenance", async (deps) => {
   try {
     await warnExpiringReceipts(deps);
     await nudgeSlowPayers(deps);
+    await purgeExpiredFiles(deps);
   } finally {
     await enqueue(deps.sql, "daily_maintenance", {}, { runAt: nextMorning(deps.now()) });
   }

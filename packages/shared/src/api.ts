@@ -33,12 +33,17 @@ export const refreshSchema = z.object({ refreshToken: z.string().min(20) });
 export const MEMBER_RELATIONS = ["self", "spouse", "child", "parent", "other"] as const;
 export type MemberRelation = (typeof MEMBER_RELATIONS)[number];
 
-export const memberCreateSchema = z.object({
-  fullName: z.string().trim().min(2).max(80),
-  relation: z.enum(MEMBER_RELATIONS).exclude(["self"]),
-  birthDate: z.iso.date().nullable().optional(),
-  phone: phoneSchema.optional(),
-});
+export const memberCreateSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(80),
+    relation: z.enum(MEMBER_RELATIONS).exclude(["self"]),
+    birthDate: z.iso.date().nullable().optional(),
+    phone: phoneSchema.optional(),
+    /** For a minor: "I am the parent or legal guardian" (privacy: consent on the child's behalf). */
+    guardianDeclared: z.boolean().optional(),
+  })
+  // A child's age decides whether they must consent themselves (18+) – so it cannot be skipped.
+  .refine((m) => m.relation !== "child" || !!m.birthDate, { message: "צריך תאריך לידה לילד/ה", path: ["birthDate"] });
 
 export const memberUpdateSchema = z.object({
   fullName: z.string().trim().min(2).max(80).optional(),
@@ -110,8 +115,16 @@ export const pushTokenSchema = z.object({
 
 export const feeDisputeSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 
+/** Each consent is separate and revocable (Privacy Protection Authority opinion on consent, 2026). */
+export const CONSENT_KINDS = ["terms", "privacy", "medical_data", "ai_processing", "poa", "marketing"] as const;
+export type ConsentKind = (typeof CONSENT_KINDS)[number];
+/** Without these the service cannot work; the others are optional. */
+export const REQUIRED_CONSENTS: ConsentKind[] = ["terms", "privacy", "medical_data"];
+/** Current versions of the legal texts (apps/server/legal/*.md). Bump when a text changes materially. */
+export const LEGAL_VERSIONS = { terms: "2026-10", privacy: "2026-10", poa: "2026-10" } as const;
+
 export const consentSchema = z.object({
-  kind: z.enum(["terms", "privacy", "poa", "marketing"]),
+  kind: z.enum(CONSENT_KINDS),
   version: z.string().min(1).max(20),
 });
 

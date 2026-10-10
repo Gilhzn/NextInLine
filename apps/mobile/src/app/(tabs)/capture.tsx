@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { ApiError, errorMessage } from "../../api/client";
 import { captureWithCamera, pickFromLibrary, pickPdf, uploadReceipt, type PickResult } from "../../lib/media";
 import { colors, space } from "../../theme";
+import { MedicalConsentGate } from "../../ui/Consents";
 import { Body, Button, Card, Loading, Screen, Title } from "../../ui";
 
 export default function Capture() {
@@ -37,15 +38,17 @@ export default function Capture() {
   return (
     <Screen>
       <Title sub="רופא פרטי, טיפול, בדיקה, משקפיים. אנחנו נבדוק ממי מגיע החזר">יש לך קבלה?</Title>
-      {busy ? (
-        <Loading label="מעלים ומצפינים..." />
-      ) : (
-        <View style={{ gap: space.md }}>
-          {Platform.OS !== "web" ? <Button title="צלם קבלה" icon="📷" onPress={() => run(captureWithCamera)} /> : null}
-          <Button title="בחר מהגלריה" icon="🖼" variant="secondary" onPress={() => run(() => pickFromLibrary(true))} />
-          <Button title="קובץ PDF / מסמך" icon="📄" variant="secondary" onPress={() => run(pickPdf)} />
-        </View>
-      )}
+      <MedicalConsentGate>
+        {busy ? (
+          <Loading label="מעלים ומצפינים..." />
+        ) : (
+          <View style={{ gap: space.md }}>
+            {Platform.OS !== "web" ? <Button title="צלם קבלה" icon="📷" onPress={() => run(captureWithCamera)} /> : null}
+            <Button title="בחר מהגלריה" icon="🖼" variant="secondary" onPress={() => run(() => pickFromLibrary(true))} />
+            <Button title="קובץ PDF / מסמך" icon="📄" variant="secondary" onPress={() => run(pickPdf)} />
+          </View>
+        )}
+      </MedicalConsentGate>
       {error ? (
         <Card tone="danger" style={{ marginTop: space.lg }}>
           <Body style={{ color: colors.danger }}>{error}</Body>

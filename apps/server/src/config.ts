@@ -52,6 +52,16 @@ const configSchema = z
     CARDCOM_API_PASSWORD: z.string().optional(),
     CARDCOM_DOCUMENT_TYPE: z.enum(["Auto", "Receipt", "TaxInvoiceAndReceipt"]).default("Auto"),
     CARDCOM_BASE_URL: z.string().url().optional(),
+    /** Days after a claim closes before its images are deleted (privacy: data minimisation). */
+    RECEIPT_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
+    // Business details shown in the terms, privacy policy and power of attorney (required in production).
+    LEGAL_ENTITY_NAME: z.string().optional(),
+    LEGAL_ENTITY_ID: z.string().optional(),
+    LEGAL_ADDRESS: z.string().optional(),
+    CONTACT_EMAIL: z.string().email().optional(),
+    DPO_NAME: z.string().optional(),
+    DPO_EMAIL: z.string().email().optional(),
+    ACCESSIBILITY_CONTACT: z.string().optional(),
     SENTRY_DSN: z.string().url().optional(),
     SENTRY_ENVIRONMENT: z.string().optional(),
     /** Build identifier shown in error reports (Render sets RENDER_GIT_COMMIT). */

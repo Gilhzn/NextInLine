@@ -8,6 +8,7 @@ import { AppError } from "./errors";
 import { captureError } from "./monitoring";
 import { adminRoutes } from "./routes/admin";
 import { opsRoutes } from "./routes/ops";
+import { legalRoutes } from "./routes/legal";
 import { paymentRoutes } from "./routes/payments";
 import { publicRoutes } from "./routes/public";
 import { userRoutes } from "./routes/user";
@@ -60,6 +61,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   await app.register(async (scope) => adminRoutes(scope, deps), { prefix: "/admin" });
   await app.register(async (scope) => opsRoutes(scope));
   await app.register(async (scope) => paymentRoutes(scope, deps));
+  await app.register(async (scope) => legalRoutes(scope, deps));
   if (deps.config.WEB_DIR) {
     const webDir = deps.config.WEB_DIR;
     await app.register(async (scope) => webRoutes(scope, webDir));

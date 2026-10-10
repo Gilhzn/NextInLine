@@ -7,16 +7,20 @@ import { ageOn, getMemberForHousehold, memberDto } from "./households";
 
 function needsConsent(relation: MemberRelation, birthDate: string | null | undefined, now: Date): boolean {
   if (relation === "self") return false;
-  if (relation === "child") return birthDate ? ageOn(birthDate, now) >= 18 : false;
+  // Without a birth date we cannot know the child is a minor, so treat them as an adult who must consent.
+  if (relation === "child") return birthDate ? ageOn(birthDate, now) >= 18 : true;
   return true;
 }
 
 export async function createMember(
   deps: Deps,
   ctx: AuthContext,
-  input: { fullName: string; relation: MemberRelation; birthDate?: string | null; phone?: string },
+  input: { fullName: string; relation: MemberRelation; birthDate?: string | null; phone?: string; guardianDeclared?: boolean },
 ): Promise<MemberDto> {
   const consent = needsConsent(input.relation, input.birthDate, deps.now());
+  if (!consent && !input.guardianDeclared) {
+    throw new AppError("validation_error", "צריך לאשר שאת/ה ההורה או האפוטרופוס של הילד/ה");
+  }
   if (consent && !input.phone) {
     throw new AppError("validation_error", "לבן משפחה בגיר צריך מספר טלפון כדי לקבל את אישורו");
   }
@@ -26,6 +30,9 @@ export async function createMember(
             ${consent ? "pending" : "not_required"}, ${consent ? input.phone! : null})
     RETURNING id`;
   const memberId = m!.id as string;
+  if (!consent) {
+    await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "guardian_declared", entity: "member", entityId: memberId });
+  }
   if (consent) await sendConsentCode(deps, ctx, memberId);
   return memberDto(await getMemberForHousehold(deps.sql, ctx.householdId, memberId));
 }

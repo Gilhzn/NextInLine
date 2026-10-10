@@ -5,6 +5,7 @@ import {
   CLAIM_STATUSES,
   claimCreateSchema,
   claimDocProvideSchema,
+  CONSENT_KINDS,
   consentSchema,
   enrollmentsPutSchema,
   policyTermPutSchema,
@@ -38,6 +39,7 @@ import { audit } from "../services/audit";
 import { coverageMap, getPolicyTerms, routeForMember, setPolicyTerm } from "../services/coverage";
 import { disputeFee, listFees } from "../services/fees";
 import { refreshCardSetup, startCardSetup } from "../services/payments";
+import { grantConsent, revokeConsent } from "../services/consents";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
 import { getMe, getMemberForHousehold, listMembers, memberDto } from "../services/households";
@@ -104,10 +106,16 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
   app.post("/consents", async (req) => {
     const ctx = auth(req);
     const input = parse(consentSchema, req.body);
-    await deps.sql`
-      INSERT INTO consents (user_id, kind, version, evidence)
-      VALUES (${ctx.userId}, ${input.kind}, ${input.version},
-              ${deps.sql.json({ ip: req.ip, userAgent: req.headers["user-agent"] ?? null } as never)})`;
+    await grantConsent(deps.sql, ctx.userId, input, { ip: req.ip, userAgent: req.headers["user-agent"] ?? null });
+    await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "consent_granted", entity: "consent", entityId: input.kind, ip: req.ip, meta: { version: input.version } });
+    return getMe(deps, ctx.userId);
+  });
+
+  app.delete<{ Params: { kind: string } }>("/consents/:kind", async (req) => {
+    const ctx = auth(req);
+    const kind = parse(z.enum(CONSENT_KINDS), req.params.kind);
+    await revokeConsent(deps.sql, ctx.userId, kind);
+    await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "consent_revoked", entity: "consent", entityId: kind, ip: req.ip });
     return getMe(deps, ctx.userId);
   });
 

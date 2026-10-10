@@ -6,6 +6,7 @@ import { errorMessage } from "../../api/client";
 import { useSetOnboardingStep, useUnclaimedReceipts } from "../../api/hooks";
 import { captureWithCamera, pickFromLibrary, pickPdf, uploadReceipt, type PickResult } from "../../lib/media";
 import { colors, space, type } from "../../theme";
+import { MedicalConsentGate } from "../../ui/Consents";
 import { Body, Button, Card, Screen, Title } from "../../ui";
 
 export default function Retro() {
@@ -55,14 +56,16 @@ export default function Retro() {
       }
     >
       <Title sub="קבלות רפואיות מ-3 השנים האחרונות: רופאים פרטיים, טיפולים, בדיקות, משקפיים">איפה הקבלות שלך?</Title>
-      {Platform.OS !== "web" ? <Button title="צלם קבלות" icon="📷" onPress={() => add(captureWithCamera)} /> : null}
-      <View style={{ height: space.sm }} />
-      <Button title="בחר מהגלריה (כמה ביחד)" icon="🖼" variant="secondary" onPress={() => add(() => pickFromLibrary(true))} />
-      <View style={{ height: space.sm }} />
-      <Button title="קובץ PDF" icon="📄" variant="secondary" onPress={() => add(pickPdf)} />
-      <Body muted style={{ marginTop: space.md }}>
-        🔒 אנחנו קוראים רק את פרטי הקבלה. לא שומרים אבחנות.
-      </Body>
+      <MedicalConsentGate>
+        {Platform.OS !== "web" ? <Button title="צלם קבלות" icon="📷" onPress={() => add(captureWithCamera)} /> : null}
+        <View style={{ height: space.sm }} />
+        <Button title="בחר מהגלריה (כמה ביחד)" icon="🖼" variant="secondary" onPress={() => add(() => pickFromLibrary(true))} />
+        <View style={{ height: space.sm }} />
+        <Button title="קובץ PDF" icon="📄" variant="secondary" onPress={() => add(pickPdf)} />
+        <Body muted style={{ marginTop: space.md }}>
+          🔒 הקבלות נשמרות מוצפנות, ונמחקות אוטומטית אחרי שהתביעה נסגרת.
+        </Body>
+      </MedicalConsentGate>
 
       {all.length > 0 || uploading > 0 ? (
         <Card tone="money" style={{ marginTop: space.xl, alignItems: "center" }}>

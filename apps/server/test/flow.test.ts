@@ -20,7 +20,7 @@ beforeAll(async () => {
     }),
     200,
   );
-  const child = expectStatus(await user.post("/v1/members", { fullName: "נועה", relation: "child", birthDate: "2020-05-01" }), 201);
+  const child = expectStatus(await user.post("/v1/members", { fullName: "נועה", relation: "child", birthDate: "2020-05-01", guardianDeclared: true }), 201);
   childId = child.id;
   expect(child.consentStatus).toBe("not_required");
   expectStatus(

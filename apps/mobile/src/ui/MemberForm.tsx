@@ -6,6 +6,7 @@ import { api, errorMessage } from "../api/client";
 import { keys } from "../api/hooks";
 import { space } from "../theme";
 import { Body, Button, Chip, Field, Row } from ".";
+import { Check } from "./Consents";
 
 const RELATIONS: Array<{ value: Exclude<MemberRelation, "self">; label: string }> = [
   { value: "child", label: "ילד/ה" },
@@ -27,10 +28,13 @@ export function MemberForm({ onDone }: { onDone: (member: MemberDto) => void }) 
   const [relation, setRelation] = useState<Exclude<MemberRelation, "self">>("child");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
+  const [guardian, setGuardian] = useState(false);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const qc = useQueryClient();
   const adult = isAdult(relation, birthDate);
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
+  const minor = relation === "child" && validDate && !adult;
 
   async function save() {
     setError(undefined);
@@ -41,6 +45,7 @@ export function MemberForm({ onDone }: { onDone: (member: MemberDto) => void }) 
         relation,
         birthDate: birthDate || null,
         ...(adult && phone ? { phone } : {}),
+        ...(minor ? { guardianDeclared: guardian } : {}),
       });
       await qc.invalidateQueries({ queryKey: keys.members });
       await qc.invalidateQueries({ queryKey: keys.me });
@@ -65,7 +70,7 @@ export function MemberForm({ onDone }: { onDone: (member: MemberDto) => void }) 
         value={birthDate}
         onChangeText={setBirthDate}
         placeholder="YYYY-MM-DD"
-        hint="חשוב לכיסויים לפי גיל (למשל התפתחות הילד)"
+        hint={relation === "child" ? "חובה לילדים: קובע את הכיסוי לפי גיל, ומי צריך לאשר בעצמו (מגיל 18)" : "חשוב לכיסויים לפי גיל"}
         keyboardType="numbers-and-punctuation"
       />
       {adult ? (
@@ -74,8 +79,18 @@ export function MemberForm({ onDone }: { onDone: (member: MemberDto) => void }) 
           <Body muted>כדי להגיש בשם בגיר נשלח לו/לה קוד אישור ב-SMS. זה נדרש לפי חוק הגנת הפרטיות.</Body>
         </>
       ) : null}
+      {minor ? (
+        <Check label="אני ההורה או האפוטרופוס" checked={guardian} onToggle={() => setGuardian((v) => !v)}>
+          <Body>אני ההורה או האפוטרופוס החוקי של {fullName.trim() || "הילד/ה"}, ורשאי/ת לפעול בשמו/ה</Body>
+        </Check>
+      ) : null}
       {error ? <Body style={{ color: "#B91C1C" }}>{error}</Body> : null}
-      <Button title="הוספה" onPress={save} loading={loading} disabled={fullName.trim().length < 2 || (adult && !phone)} />
+      <Button
+        title="הוספה"
+        onPress={save}
+        loading={loading}
+        disabled={fullName.trim().length < 2 || (adult && !phone) || (relation === "child" && !validDate) || (minor && !guardian)}
+      />
     </View>
   );
 }

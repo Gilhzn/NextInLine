@@ -18,6 +18,7 @@ COPY --from=build /repo/apps/server/package.json apps/server/
 RUN npm ci --omit=dev --workspace @magiali/server --ignore-scripts && npm cache clean --force
 COPY --from=build /repo/apps/server/dist apps/server/dist
 COPY --from=build /repo/apps/server/migrations apps/server/migrations
+COPY --from=build /repo/apps/server/legal apps/server/legal
 WORKDIR /app/apps/server
 USER node
 EXPOSE 4000

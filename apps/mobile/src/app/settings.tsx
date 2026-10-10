@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Alert, Platform, Switch } from "react-native";
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CATEGORY_INFO, formatILS, type FeeDto } from "@magiali/shared";
@@ -9,6 +9,9 @@ import { useAuth } from "../state/auth";
 import { colors, space } from "../theme";
 import { Badge, Body, Button, Card, Loading, Screen, Spread, Title } from "../ui";
 import { PaymentMethodForm } from "../ui/PaymentMethodForm";
+import { CONSENT_COPY, useConsents } from "../ui/Consents";
+import { openLegal } from "../lib/legal";
+import { useQuery } from "@tanstack/react-query";
 
 const FEE_STATUS: Record<FeeDto["status"], { label: string; tone: "primary" | "money" | "warning" | "danger" | "muted" }> = {
   pending: { label: "ממתינה", tone: "muted" },
@@ -33,6 +36,12 @@ function confirm(title: string, message: string): Promise<boolean> {
 export default function Settings() {
   const me = useMe();
   const fees = useFees();
+  const consentActions = useConsents();
+  const legal = useQuery({
+    queryKey: ["legal"],
+    queryFn: () => api<{ dpoEmail: string | null; contactEmail: string | null }>("GET", "/v1/legal"),
+    staleTime: 3_600_000,
+  });
   const claims = useClaims();
   const qc = useQueryClient();
   const { refreshToken, signOut } = useAuth();
@@ -104,14 +113,31 @@ export default function Settings() {
 
       <Card>
         <Body style={{ fontWeight: "700" }}>🔒 הסכמות</Body>
-        <Spread>
-          <Body>תנאי שימוש ופרטיות</Body>
-          <Body>{consents.has("terms") ? "✓" : "—"}</Body>
-        </Spread>
-        <Spread>
-          <Body>ייפוי כוח להגשה ומעקב</Body>
-          <Body>{consents.has("poa") ? "✓" : "—"}</Body>
-        </Spread>
+        <Body muted>כל הסכמה עומדת בפני עצמה. ביטול חל מעכשיו והלאה.</Body>
+        {(["medical_data", "ai_processing", "poa", "marketing"] as const).map((kind) => (
+          <Spread key={kind} style={{ paddingVertical: space.xs }}>
+            <Body style={{ flex: 1 }}>{CONSENT_COPY[kind].label}</Body>
+            <Switch
+              value={consents.has(kind)}
+              accessibilityLabel={CONSENT_COPY[kind].label}
+              trackColor={{ true: colors.primary, false: colors.border }}
+              onValueChange={(on) =>
+                void (on ? consentActions.grant([kind]) : consentActions.revoke(kind)).catch((e) => setMessage(errorMessage(e)))
+              }
+            />
+          </Spread>
+        ))}
+        <Body muted>תנאי השימוש ומדיניות הפרטיות: {consents.has("terms") ? "✓ אושרו" : "—"}</Body>
+      </Card>
+
+      <Card>
+        <Body style={{ fontWeight: "700" }}>📄 מסמכים ופרטיות</Body>
+        <Button title="תנאי שימוש" variant="ghost" onPress={() => openLegal("terms")} />
+        <Button title="מדיניות פרטיות" variant="ghost" onPress={() => openLegal("privacy")} />
+        <Button title="ייפוי הכוח" variant="ghost" onPress={() => openLegal("poa")} />
+        <Button title="הצהרת נגישות" variant="ghost" onPress={() => openLegal("accessibility")} />
+        {legal.data?.dpoEmail ? <Body muted>הממונה על הגנת הפרטיות: {legal.data.dpoEmail}</Body> : null}
+        {legal.data?.contactEmail ? <Body muted>פניות ובקשות לתיקון מידע: {legal.data.contactEmail}</Body> : null}
       </Card>
 
       <Card>

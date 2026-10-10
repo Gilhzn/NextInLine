@@ -100,6 +100,9 @@ export function productionProblems(config: Config, summary: ProviderSummary): st
   if (config.WEB_DIR && !config.PUBLIC_BASE_URL.startsWith("https://") && config.PUBLIC_BASE_URL !== "") {
     problems.push("PUBLIC_BASE_URL must be https in production");
   }
+  const legal = ["LEGAL_ENTITY_NAME", "LEGAL_ENTITY_ID", "LEGAL_ADDRESS", "CONTACT_EMAIL", "DPO_NAME", "DPO_EMAIL"] as const;
+  const missingLegal = legal.filter((k) => !config[k]);
+  if (missingLegal.length) problems.push(`Legal details for the terms and privacy policy: set ${missingLegal.join(", ")}`);
   // Hosts with a dot are reached over the internet (Neon, Render external URL); internal names and localhost are not.
   const db = new URL(config.DATABASE_URL);
   const sslmode = db.searchParams.get("sslmode");

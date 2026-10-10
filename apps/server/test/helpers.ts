@@ -132,7 +132,12 @@ export async function createTestEnv(): Promise<TestEnv> {
   };
 }
 
-export async function login(env: TestEnv, phone = "0501234567"): Promise<{ token: string; refreshToken: string; me: any }> {
+/** Logs in by SMS code. By default also gives the consents a user gives at onboarding (opt out with `consents: []`). */
+export async function login(
+  env: TestEnv,
+  phone = "0501234567",
+  opts: { consents?: string[] } = {},
+): Promise<{ token: string; refreshToken: string; me: any }> {
   const req = await env.app.inject({ method: "POST", url: "/v1/auth/otp/request", payload: { phone } });
   if (req.statusCode !== 204) throw new Error(`otp request failed: ${req.body}`);
   const e164 = `+972${phone.replace(/^0/, "")}`;
@@ -140,6 +145,14 @@ export async function login(env: TestEnv, phone = "0501234567"): Promise<{ token
   const res = await env.app.inject({ method: "POST", url: "/v1/auth/otp/verify", payload: { phone, code } });
   if (res.statusCode !== 200) throw new Error(`otp verify failed: ${res.body}`);
   const body = res.json();
+  for (const kind of opts.consents ?? ["terms", "privacy", "medical_data", "ai_processing"]) {
+    await env.app.inject({
+      method: "POST",
+      url: "/v1/consents",
+      headers: { authorization: `Bearer ${body.accessToken}` },
+      payload: { kind, version: "2026-10" },
+    });
+  }
   return { token: body.accessToken, refreshToken: body.refreshToken, me: body.me };
 }
 
