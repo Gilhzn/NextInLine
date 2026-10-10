@@ -158,7 +158,10 @@ export function computeRouting(input: RoutingInput): RoutingResult {
       notes.push(`${enrollment.planName}: נותרו ${eligibleSessions} מתוך ${sessions} מפגשים בקבלה`);
     }
 
-    const base = remaining;
+    // A "משלים שב"ן" policy pays a share of what the shaban left. Any other later payer computes its own benefit on
+    // the full expense (as its policy is written) and pays at most what is still uncovered (indemnity).
+    const supplement = legs.length > 0 && enrollmentRank(enrollment) === 1;
+    const base = legs.length === 0 || supplement ? remaining : amountAgorot;
     let amount: number;
     let basis: string;
 
@@ -167,7 +170,7 @@ export function computeRouting(input: RoutingInput): RoutingResult {
       basis = `${shekels(rule.perSessionFixedAgorot)} ₪ למפגש × ${eligibleSessions}`;
     } else {
       amount = Math.floor((base * rule.percent) / 100);
-      basis = `${rule.percent}%${legs.length > 0 ? " מההפרש" : ""}`;
+      basis = `${rule.percent}%${legs.length === 0 ? "" : supplement ? " מההפרש" : " מההוצאה"}`;
       if (rule.perSessionCapAgorot !== null && amount > rule.perSessionCapAgorot * eligibleSessions) {
         amount = rule.perSessionCapAgorot * eligibleSessions;
         basis += `, עד ${shekels(rule.perSessionCapAgorot)} ₪ למפגש`;
@@ -186,7 +189,8 @@ export function computeRouting(input: RoutingInput): RoutingResult {
     }
 
     amount -= rule.deductibleAgorot;
-    amount = Math.max(0, Math.min(amount, base));
+    if (amount > remaining && legs.length > 0) basis += ", עד היתרה שלא הוחזרה";
+    amount = Math.max(0, Math.min(amount, remaining));
 
     if (amount === 0) {
       notes.push(`${enrollment.planName}: לא נותר החזר בכיסוי הזה`);

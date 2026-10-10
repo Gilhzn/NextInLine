@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BENEFIT_CATEGORIES, type BenefitCategory } from "./categories";
 import type { ClaimStatus, LegStatus } from "./claimState";
-import { DOC_KINDS, type DocKind, type PlanKind, type RoutingResult } from "./rules";
+import { DOC_KINDS, benefitRuleSchema, type BenefitRule, type DocKind, type PlanKind, type RoutingResult } from "./rules";
 
 /** Accepts 05XXXXXXXX / 5XXXXXXXX / +9725XXXXXXXX / 9725XXXXXXXX (spaces and dashes ignored). */
 export function normalizeIsraeliMobile(input: string): string | null {
@@ -162,6 +162,7 @@ export interface PlanDto {
   payerId: string;
   payerName: string;
   kind: PlanKind;
+  description: string | null;
 }
 
 export interface EnrollmentDto {
@@ -172,6 +173,33 @@ export interface EnrollmentDto {
   planKind: PlanKind;
   isShabanSupplement: boolean;
 }
+
+export type BenefitConfidence = "official" | "secondary" | "unverified";
+
+/** One category of a policy as the user sees it: what the catalog says, and what they set for their own policy. */
+export interface PolicyTermDto {
+  category: BenefitCategory;
+  label: string;
+  icon: string;
+  catalog: { rule: BenefitRule; summary: string; confidence: BenefitConfidence; note: string | null; sourceUrl: string | null } | null;
+  /** undefined = use the catalog; null = "my policy doesn't cover this" */
+  custom?: BenefitRule | null;
+}
+
+export interface PolicyTermsDto {
+  memberId: string;
+  planId: string;
+  planName: string;
+  planKind: PlanKind;
+  description: string | null;
+  terms: PolicyTermDto[];
+}
+
+export const policyTermPutSchema = z.object({
+  category: z.enum(BENEFIT_CATEGORIES),
+  /** a rule, null = not covered, "reset" = back to the catalog value */
+  rule: z.union([benefitRuleSchema, z.null(), z.literal("reset")]),
+});
 
 export interface CoverageItemDto {
   category: BenefitCategory;
@@ -186,6 +214,10 @@ export interface CoverageItemDto {
       summary: string;
       remainingSessions: number | null;
       remainingCapAgorot: number | null;
+      /** custom = the user's own policy terms */
+      confidence: BenefitConfidence | "custom";
+      note: string | null;
+      sourceUrl: string | null;
     }>;
   }>;
 }

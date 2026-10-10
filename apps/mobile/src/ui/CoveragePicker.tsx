@@ -87,10 +87,11 @@ export function CoveragePicker({
                 onPress={() => {
                   const next = { ...value.privatePlans };
                   if (selected) delete next[p.id];
-                  else next[p.id] = p.kind === "private_individual";
+                  else next[p.id] = false;
                   onChange({ ...value, privatePlans: next });
                 }}
               />
+              {selected && p.description ? <Text style={{ fontSize: type.small, color: colors.muted, paddingHorizontal: space.sm }}>{p.description}</Text> : null}
               {selected && p.kind === "private_individual" ? (
                 <Row style={{ paddingHorizontal: space.sm }}>
                   <Switch

@@ -78,9 +78,9 @@ await shot("family");
 await click("המשך");
 
 await see("איך אתם מבוטחים?");
-await vis(page.getByRole("button", { name: "מכבי", exact: true })).click();
-await click("מכבי שלי");
-await click("הראל – שירותים אמבולטוריים");
+await vis(page.getByRole("button", { name: "כללית", exact: true })).click();
+await click("כללית מושלם זהב");
+await click("הראל – טיפולים ואבחונים לילד");
 await shot("coverage");
 await click("המשך");
 
@@ -127,7 +127,8 @@ await shot("receipt-review");
 await click("הכל נכון, כמה מגיע לי?");
 
 await see("כך תקבל את הכסף");
-await see("246.50");
+// Clalit: 75% up to ₪125 → 125; Harel: 50% of 350 = 175 (within what is left). Net after the 15% fee: 255.
+await see("255");
 await shot("money-route");
 
 const chooser2 = page.waitForEvent("filechooser");
@@ -138,12 +139,12 @@ await see("פתח תיק מוכן להגשה");
 await shot("claim-submitted");
 
 await click("פתח תיק מוכן להגשה");
-await see("הגשה למכבי");
+await see("הגשה לכללית");
 await shot("submission-pack");
 await click("הגשתי ✓ תעקבו בשבילי");
 
-await see("קיבלת תשובה ממכבי?");
-await vis(page.getByLabel("כמה הגיע (₪)")).first().fill("200");
+await see("קיבלת תשובה מכללית?");
+await vis(page.getByLabel("כמה הגיע (₪)")).first().fill("125");
 await click("הכסף הגיע ✓");
 await see("ממתין לשלב הקודם", 2000).catch(() => {});
 await see("מוכן להגשה");

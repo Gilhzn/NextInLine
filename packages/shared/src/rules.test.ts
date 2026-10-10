@@ -84,7 +84,7 @@ describe("computeRouting", () => {
     expect(r.legs[0]!.requiredDocs).not.toContain("payer_payment_proof");
   });
 
-  it("fixed per-session amount + group 50% of the remainder (psychologist 450 = 85 + 182.50)", () => {
+  it("fixed per-session amount + group 50% of the full expense (psychologist 450 = 85 + 225)", () => {
     const r = computeRouting({
       ...base,
       category: "psychology",
@@ -94,7 +94,25 @@ describe("computeRouting", () => {
         group({ psychology: rule({ percent: 50, perSessionCapAgorot: 40000 }) }),
       ],
     });
-    expect(r.legs.map((l) => l.expectedAgorot)).toEqual([8500, 18250]);
+    expect(r.legs.map((l) => l.expectedAgorot)).toEqual([8500, 22500]);
+    expect(r.legs[1]!.basis).toBe("50% מההוצאה");
+  });
+
+  it("a non-supplement policy computes on the full expense but pays only what is still uncovered (1000 = 600 + 400)", () => {
+    const individual: RoutingEnrollment = { ...supplement({}), isShabanSupplement: false };
+    const r = computeRouting({
+      ...base,
+      category: "specialist_visit",
+      amountAgorot: 100000,
+      enrollments: [
+        shaban({ specialist_visit: rule({ percent: 60 }) }),
+        { ...individual, benefits: { specialist_visit: rule({ percent: 80, perSessionCapAgorot: 80000 }) } },
+      ],
+    });
+    // Policy benefit = min(80% × 1000, 800) = 800, limited to the 400 the shaban left.
+    expect(r.legs.map((l) => l.expectedAgorot)).toEqual([60000, 40000]);
+    expect(r.legs[1]!.basis).toBe("80% מההוצאה, עד היתרה שלא הוחזרה");
+    expect(r.uncoveredAgorot).toBe(0);
   });
 
   it("exhausted session quota skips the shaban and lets the private plan pay on the full amount", () => {

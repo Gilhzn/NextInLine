@@ -76,6 +76,16 @@ export default function MemberScreen() {
         <CoveragePicker plans={plans.data} value={selection} onChange={setSelection} />
       </Card>
 
+      {enrollments.data.length > 0 ? (
+        <Card>
+          <Body style={{ fontWeight: "700" }}>📄 התנאים בביטוחים שלך</Body>
+          <Body muted>כדי שהחישוב יהיה מדויק, בדוק את התנאים מול הפוליסה (בעיקר בביטוח פרטי ומהעבודה).</Body>
+          {enrollments.data.map((e) => (
+            <Button key={e.planId} title={e.planName} variant="secondary" onPress={() => router.push(`/policy/${id}/${e.planId}`)} />
+          ))}
+        </Card>
+      ) : null}
+
       {message ? <Body style={{ color: message.ok ? colors.money : colors.danger, marginBottom: space.md }}>{message.text}</Body> : null}
 
       {!member.isSelf ? (

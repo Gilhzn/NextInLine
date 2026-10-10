@@ -7,6 +7,7 @@ import {
   claimDocProvideSchema,
   consentSchema,
   enrollmentsPutSchema,
+  policyTermPutSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
   meUpdateSchema,
@@ -33,7 +34,8 @@ import {
   submitClaim,
   userUpdateLeg,
 } from "../services/claims";
-import { coverageMap, routeForMember } from "../services/coverage";
+import { audit } from "../services/audit";
+import { coverageMap, getPolicyTerms, routeForMember, setPolicyTerm } from "../services/coverage";
 import { disputeFee, listFees } from "../services/fees";
 import { refreshCardSetup, startCardSetup } from "../services/payments";
 import { publicOrigin } from "./payments";
@@ -141,6 +143,21 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
     return confirmMemberConsent(deps, auth(req), memberId, code);
   });
 
+  app.get<{ Params: { id: string; planId: string } }>("/members/:id/enrollments/:planId/terms", async (req) => {
+    const { id } = parse(idParam, { id: req.params.id });
+    return getPolicyTerms(deps.sql, auth(req).householdId, id, parse(z.string().max(60), req.params.planId));
+  });
+
+  app.put<{ Params: { id: string; planId: string } }>("/members/:id/enrollments/:planId/terms", async (req) => {
+    const { id } = parse(idParam, { id: req.params.id });
+    const planId = parse(z.string().max(60), req.params.planId);
+    const input = parse(policyTermPutSchema, req.body);
+    const ctx = auth(req);
+    await setPolicyTerm(deps.sql, ctx.householdId, id, planId, input.category, input.rule);
+    await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "policy_terms_set", entity: "enrollment", entityId: `${id}:${planId}`, meta: { category: input.category } });
+    return getPolicyTerms(deps.sql, ctx.householdId, id, planId);
+  });
+
   app.get("/members/:id/enrollments", async (req) => {
     const { id } = parse(idParam, req.params);
     return listEnrollments(deps, auth(req), id);
@@ -156,7 +173,7 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
   // ---------- catalog & coverage ----------
   app.get("/catalog/plans", async (): Promise<PlanDto[]> => {
     const rows = await deps.sql`
-      SELECT p.id, p.name_he, p.payer_id, py.name_he AS payer_name, p.plan_kind
+      SELECT p.id, p.name_he, p.payer_id, py.name_he AS payer_name, p.plan_kind, p.description
       FROM plans p JOIN payers py ON py.id = p.payer_id WHERE p.active
       ORDER BY CASE p.plan_kind WHEN 'shaban' THEN 0 WHEN 'private_individual' THEN 1 ELSE 2 END, py.id, p.id`;
     return rows.map((r) => ({
@@ -165,6 +182,7 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
       payerId: r.payerId as string,
       payerName: r.payerName as string,
       kind: r.planKind as PlanDto["kind"],
+      description: (r.description as string | null) ?? null,
     }));
   });
 

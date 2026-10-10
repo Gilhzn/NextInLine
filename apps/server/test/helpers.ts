@@ -1,3 +1,4 @@
+import { useTestCatalog } from "./catalog.fixture";
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import type { ExtractedFields } from "@magiali/shared";
@@ -59,6 +60,7 @@ export async function createTestEnv(): Promise<TestEnv> {
   const sql = createSql(url.toString(), { max: 5 });
   await migrate(sql);
   await seedCatalog(sql);
+  await useTestCatalog(sql);
 
   const config = loadConfig({
     NODE_ENV: "test",
