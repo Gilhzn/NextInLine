@@ -116,6 +116,8 @@ export default function ImportPolicies() {
             (לכל בני המשפחה שבחרת).
           </Body>
         </Card>
+        {/* During onboarding the coverage isn't saved yet – the overview comes after it. */}
+        {!next ? <Button title="מה מגיע לנו עכשיו? סקירה מלאה" icon="📋" onPress={() => router.replace("/entitlements")} /> : null}
         {done.checkTerms.length > 0 ? (
           <Card tone="warning">
             <Body style={{ fontWeight: "700" }}>כדי שהחישוב יהיה מדויק, בדוק את התנאים:</Body>

@@ -171,12 +171,14 @@ export function computeRouting(input: RoutingInput): RoutingResult {
     } else {
       amount = Math.floor((base * rule.percent) / 100);
       basis = `${rule.percent}%${legs.length === 0 ? "" : supplement ? " מההפרש" : " מההוצאה"}`;
+      // Only the sessions still in the quota count. Scale first, then cap per session: scaling after the cap
+      // would cut an already-capped amount a second time.
+      if (eligibleSessions < sessions) {
+        amount = Math.floor((amount * eligibleSessions) / sessions);
+      }
       if (rule.perSessionCapAgorot !== null && amount > rule.perSessionCapAgorot * eligibleSessions) {
         amount = rule.perSessionCapAgorot * eligibleSessions;
         basis += `, עד ${shekels(rule.perSessionCapAgorot)} ₪ למפגש`;
-      }
-      if (eligibleSessions < sessions) {
-        amount = Math.floor((amount * eligibleSessions) / sessions);
       }
     }
 

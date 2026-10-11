@@ -117,3 +117,22 @@ export function searchCategories(query: string): BenefitCategory[] {
   }
   return scored.sort((a, b) => b.score - a.score).map((s) => s.category);
 }
+
+/**
+ * A typical private price in Israel (2026) per visit / item, used only for worked examples and estimates
+ * ("on a visit of ₪650 you'd get back ₪520"). Always shown as an example the user can change.
+ */
+export const TYPICAL_PRICE_AGOROT: Record<BenefitCategory, number> = {
+  specialist_visit: 65000,
+  physiotherapy: 25000,
+  psychology: 45000,
+  child_development: 35000,
+  diagnostic_imaging: 180000,
+  lab_tests: 30000,
+  alternative_medicine: 30000,
+  glasses_lenses: 120000,
+  dental: 80000,
+  second_opinion: 150000,
+  medical_devices: 200000,
+  other: 40000,
+};

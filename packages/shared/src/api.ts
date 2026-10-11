@@ -387,3 +387,46 @@ export const policyImportApplySchema = z.object({
     .min(1)
     .max(40),
 });
+
+// ---------- Entitlement overview: everything the household can get back ----------
+
+export interface EntitlementCategoryDto {
+  category: BenefitCategory;
+  label: string;
+  icon: string;
+  /** Worked example at a typical price, using this year's remaining quotas. */
+  example: { priceAgorot: number; refundAgorot: number; legs: Array<{ planName: string; amountAgorot: number }> };
+  remaining: Array<{ planName: string; sessions: number | null; capAgorot: number | null }>;
+  requiredDocs: DocKind[];
+  notes: string[];
+}
+
+export interface EntitlementSummaryDto {
+  members: Array<{ memberId: string; memberName: string; categories: EntitlementCategoryDto[] }>;
+  /** Categories nobody in the household is covered for (among those people usually pay for privately). */
+  gaps: Array<{ category: BenefitCategory; label: string; icon: string }>;
+  /** Policies we can't calculate yet: the user still has to enter the terms. */
+  missingTerms: Array<{ memberId: string; memberName: string; planId: string; planName: string }>;
+  pendingConsent: string[];
+  openMoney: { unclaimedReceipts: number; unclaimedAgorot: number; inFlightAgorot: number };
+}
+
+export const entitlementEstimateSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        memberId: z.uuid(),
+        category: z.enum(BENEFIT_CATEGORIES),
+        /** visits / items paid privately over the last 3 years */
+        visits: z.number().int().min(1).max(300),
+        priceAgorot: z.number().int().min(100).max(10_000_000),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+
+export interface EntitlementEstimateDto {
+  items: Array<{ memberId: string; category: BenefitCategory; visits: number; priceAgorot: number; refundAgorot: number }>;
+  totalAgorot: number;
+}

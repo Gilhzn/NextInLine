@@ -145,6 +145,18 @@ describe("computeRouting", () => {
     expect(r.legs[0]!.expectedAgorot).toBe(30000);
   });
 
+  it("a capped visit beyond the remaining quota is not cut twice (4 visits, 3 left, cap 715)", () => {
+    const r = computeRouting({
+      ...base,
+      category: "second_opinion",
+      amountAgorot: 600000,
+      sessions: 4,
+      enrollments: [shaban({ second_opinion: rule({ percent: 80, perSessionCapAgorot: 71500, annualSessions: 3 }) })],
+    });
+    // 80% of the 3 covered visits (₪3,600) is above 3 × ₪715 → ₪2,145.
+    expect(r.legs[0]!.expectedAgorot).toBe(214500);
+  });
+
   it("annual cap trims to what is left", () => {
     const r = computeRouting({
       ...base,

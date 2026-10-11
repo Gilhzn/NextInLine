@@ -67,6 +67,14 @@ export default function Home() {
               ) : null}
             </Card>
 
+            <Card onPress={() => router.push("/entitlements")} style={{ marginTop: space.md }}>
+              <Spread>
+                <Body style={{ flex: 1, fontWeight: "700" }}>📋 כל מה שמגיע לכם – סקירה מלאה</Body>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+              </Spread>
+              <Body muted>כל ההחזרים לפי ביטוח ובן משפחה, וכמה מחכה לכם מ-3 השנים האחרונות</Body>
+            </Card>
+
             {home.data.actionItems.length > 0 ? (
               <View style={{ marginTop: space.md }}>
                 <Text style={sectionTitle}>צריך אותך ({home.data.actionItems.length})</Text>

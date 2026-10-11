@@ -14,6 +14,7 @@ export default function Benefits() {
   return (
     <Screen>
       <Title sub="מידע על הכיסויים שלכם. לא המלצה לקנות או לבטל ביטוח">מה מגיע לי על...?</Title>
+      <Button title="סקירה מלאה: כל מה שמגיע לכם" icon="📋" variant="secondary" onPress={() => router.push("/entitlements")} />
       <Field label="חיפוש" value={q} onChangeText={setQ} placeholder="פסיכולוג, פיזיו, MRI, משקפיים..." />
       {searching ? (
         <>

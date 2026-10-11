@@ -10,6 +10,7 @@ import {
   enrollmentsPutSchema,
   policyTermPutSchema,
   policyImportApplySchema,
+  entitlementEstimateSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
   meUpdateSchema,
@@ -42,6 +43,7 @@ import { disputeFee, listFees } from "../services/fees";
 import { refreshCardSetup, startCardSetup } from "../services/payments";
 import { grantConsent, revokeConsent } from "../services/consents";
 import { applyPolicyImport, previewPolicyImport } from "../services/policy-import";
+import { entitlementSummary, estimateEntitlements } from "../services/entitlements";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
 import { getMe, getMemberForHousehold, listMembers, memberDto } from "../services/households";
@@ -195,6 +197,12 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
       description: (r.description as string | null) ?? null,
     }));
   });
+
+  // Everything the household can get back, and an estimate of what may be waiting from the last 3 years.
+  app.get("/coverage/summary", async (req) => entitlementSummary(deps, auth(req)));
+  app.post("/coverage/estimate", async (req) =>
+    estimateEntitlements(deps, auth(req), parse(entitlementEstimateSchema, req.body).items),
+  );
 
   // Import from Har HaBituach: preview (nothing saved, file discarded), then apply what the user confirmed.
   app.post("/coverage/import", async (req) => {

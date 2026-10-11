@@ -65,6 +65,7 @@ function RootLayout() {
           <Stack.Screen name="member/new" options={{ headerShown: true, title: "הוספת בן משפחה" }} />
           <Stack.Screen name="settings" options={{ headerShown: true, title: "הגדרות" }} />
           <Stack.Screen name="policy/[memberId]/[planId]" options={{ headerShown: true, title: "תנאי הביטוח" }} />
+          <Stack.Screen name="entitlements" options={{ headerShown: true, title: "כל מה שמגיע לכם" }} />
           <Stack.Screen name="import" options={{ headerShown: true, title: "ייבוא מהר הביטוח" }} />
           <Stack.Screen name="payment-return" options={{ headerShown: true, title: "אמצעי תשלום" }} />
           <Stack.Screen name="notifications" options={{ headerShown: true, title: "התראות" }} />

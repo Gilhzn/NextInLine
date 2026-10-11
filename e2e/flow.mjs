@@ -231,6 +231,17 @@ await see("עמלות הצלחה");
 await see("חויבה");
 await shot("settings-fees");
 
+// The full overview: everything the family can get back, and an estimate for the last 3 years.
+await page.goto(`${BASE_URL}/entitlements`);
+await see("כל מה שמגיע לכם");
+await see("התפתחות הילד");
+await see("לא מצאנו כיסוי ל:");
+await vis(page.getByRole("button", { name: "נועה", exact: true })).click();
+await vis(page.getByLabel("כמה פעמים")).first().fill("12");
+await click("חשבו לי");
+await see("בערך מחכים לכם");
+await shot("entitlements");
+
 for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
   await page.goto(`${BASE_URL}/legal/${doc}`);
   await see(text);
