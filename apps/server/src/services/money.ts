@@ -1,9 +1,6 @@
 import {
   CATEGORY_INFO,
-  TYPICAL_PRICE_AGOROT,
-  computeRouting,
   formatILS,
-  usageKey,
   type BenefitCategory,
   type MoneyDto,
   type MoneyItemDto,
@@ -11,7 +8,8 @@ import {
 } from "@magiali/shared";
 import type { AuthContext, Deps } from "../context";
 import { currentCatalogVersion } from "../catalog";
-import { loadRoutingEnrollments, loadUsage, routeForMember } from "./coverage";
+import { loadRoutingEnrollments, routeForMember } from "./coverage";
+import { unusedQuotas } from "./quota";
 import { listMembers } from "./households";
 
 const CLAIM_WINDOW_DAYS = 3 * 365;
@@ -212,41 +210,17 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
 
   // ---------- where we can still save ----------
   const save: MoneyItemDto[] = [];
-  const year = now.getUTCFullYear();
-  const yearEnd = `31/12/${year}`;
-  for (const m of members) {
-    const ens = enrollments.get(m.id) ?? [];
-    if (!ens.length) continue;
-    const usage = await loadUsage(deps.sql, m.id, year);
-    // Quotas worth reminding about: services this person actually uses (in the range) that have sessions left.
-    const used = new Set(serviceList.filter((s) => s.memberId === m.id).map((s) => s.category));
-    for (const category of used) {
-      const rule = ens.map((e) => ({ e, rule: e.benefits[category] })).find((x) => x.rule && x.rule.annualSessions !== null);
-      if (!rule) continue;
-      const u = usage[usageKey(rule.e.planId, category)] ?? { sessions: 0, amountAgorot: 0 };
-      const left = rule.rule!.annualSessions! - u.sessions;
-      if (left <= 0) continue;
-      // Value the remaining sessions at what this family actually pays per visit.
-      const s = serviceList.find((x) => x.memberId === m.id && x.category === category)!;
-      const one = computeRouting({
-        category,
-        amountAgorot: s.visits > 0 ? Math.round(s.paidAgorot / s.visits) : TYPICAL_PRICE_AGOROT[category],
-        sessions: 1,
-        serviceDate: isoDay(now),
-        memberBirthDate: m.birthDate,
-        enrollments: ens,
-        usage,
-      });
-      if (one.totalExpectedAgorot === 0) continue;
-      save.push({
-        kind: "unused_quota",
-        title: `${CATEGORY_INFO[category].icon} נשארו ל${m.fullName} ${left} ${CATEGORY_INFO[category].label} עד ${yearEnd}`,
-        detail: `${rule.e.planName} · בערך ${formatILS(one.totalExpectedAgorot)} החזר לכל אחד`,
-        amountAgorot: one.totalExpectedAgorot * left,
-        urgent: now.getUTCMonth() >= 9,
-        action: { type: "benefits" },
-      });
-    }
+  const yearEnd = `31/12/${now.getUTCFullYear()}`;
+  // Quotas worth reminding about: services this person actually used in the range that have sessions left.
+  for (const q of await unusedQuotas(deps, ctx.householdId, from)) {
+    save.push({
+      kind: "unused_quota",
+      title: `${q.icon} נשארו ל${q.memberName} ${q.left} ${q.label} עד ${yearEnd}`,
+      detail: `${q.planName} · בערך ${formatILS(q.valueEachAgorot)} החזר לכל אחד`,
+      amountAgorot: q.valueEachAgorot * q.left,
+      urgent: now.getUTCMonth() >= 9,
+      action: { type: "plan_visit", memberId: q.memberId, category: q.category },
+    });
   }
   for (const s of serviceList) {
     if (!s.covered && s.paidAgorot > 0) {

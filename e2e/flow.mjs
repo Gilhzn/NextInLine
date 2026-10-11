@@ -274,6 +274,21 @@ await see(/שילמתם לד"ר כהן רופא עור/);
 await see("🩺 השירותים שלנו");
 await shot("health-money");
 
+// Before booking: compare a private therapist with an in-network co-payment, and see what to arrange first.
+await page.goto(`${BASE_URL}/before-booking`);
+await see("לפני שקובעים תור");
+await vis(page.getByRole("button", { name: "נועה", exact: true })).click();
+await vis(page.getByRole("button", { name: /התפתחות הילד/ })).first().click();
+await see("עולה לכם");
+await click("+ מקום נוסף להשוואה");
+await vis(page.getByRole("button", { name: "בהסדר (השתתפות עצמית)" })).last().click();
+await vis(page.getByLabel("השתתפות עצמית (₪)")).first().fill("40");
+await click("כמה זה יעלה לנו?");
+await see("הכי משתלם");
+await see("מה להכין");
+await vis(page.getByText("הכי משתלם")).first().scrollIntoViewIfNeeded();
+await shot("before-booking");
+
 for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
   await page.goto(`${BASE_URL}/legal/${doc}`);
   await see(text);

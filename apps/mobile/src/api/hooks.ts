@@ -39,7 +39,7 @@ export interface NotificationItem {
   type: string;
   title: string;
   body: string;
-  data: { claimId?: string; receiptId?: string; feeId?: string; memberId?: string } | null;
+  data: { claimId?: string; receiptId?: string; feeId?: string; memberId?: string; screen?: string } | null;
   createdAt: string;
   readAt: string | null;
 }
@@ -134,3 +134,8 @@ export function useInvalidateAll() {
 }
 
 export type { RoutingResult };
+
+/** Screens a notification may open by name (anything else is ignored). */
+export const NOTIFICATION_SCREENS = ["/money", "/before-booking", "/entitlements"] as const;
+export const notificationScreen = (screen: unknown) =>
+  NOTIFICATION_SCREENS.find((s) => s === screen) ?? null;

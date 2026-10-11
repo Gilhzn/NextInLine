@@ -439,7 +439,8 @@ export type MoneyAction =
   | { type: "policy"; memberId: string; planId: string }
   | { type: "capture" }
   | { type: "lead"; id: string }
-  | { type: "benefits" };
+  | { type: "benefits" }
+  | { type: "plan_visit"; memberId: string; category: BenefitCategory };
 
 export interface MoneyItemDto {
   kind:
@@ -525,3 +526,59 @@ export const paymentLeadsSaveSchema = z.object({
     .min(1)
     .max(100),
 });
+
+// ---------- Before booking: what a visit will really cost, and what to arrange first ----------
+
+export const beforeBookingSchema = z.object({
+  memberId: z.uuid(),
+  category: z.enum(BENEFIT_CATEGORIES),
+  sessions: z.number().int().min(1).max(50).default(1),
+  date: z.iso.date().optional(),
+  /** Up to 3 places to compare. Empty: one private visit at the price this family usually pays. */
+  options: z
+    .array(
+      z.object({
+        label: z.string().trim().max(60).optional(),
+        /** Per session. For "network", the co-payment the HMO or insurer quoted. */
+        priceAgorot: z.number().int().positive().max(10_000_000),
+        kind: z.enum(["private", "network"]).default("private"),
+      }),
+    )
+    .max(3)
+    .default([]),
+});
+export type BeforeBookingInput = z.input<typeof beforeBookingSchema>;
+
+export interface BookingOptionDto {
+  label: string;
+  kind: "private" | "network";
+  priceAgorot: number;
+  refundAgorot: number;
+  /** What the family is left paying after every refund. */
+  netAgorot: number;
+  legs: Array<{ planName: string; amountAgorot: number; basis: string }>;
+  best: boolean;
+}
+
+export interface BeforeBookingDto {
+  memberId: string;
+  memberName: string;
+  category: BenefitCategory;
+  label: string;
+  icon: string;
+  sessions: number;
+  date: string;
+  covered: boolean;
+  /** The price used when no options were given, and where it came from. */
+  suggestedPriceAgorot: number;
+  suggestedFrom: "history" | "typical";
+  history: { visits: number; avgPriceAgorot: number } | null;
+  options: BookingOptionDto[];
+  /** The refund per visit stops growing at this price: every shekel above it comes out of pocket. */
+  maxRefund: { refundAgorot: number; fromPriceAgorot: number } | null;
+  quota: Array<{ planName: string; perYear: number | null; sessionsLeft: number | null; capLeftAgorot: number | null }>;
+  /** Set when this year's quota is used up: when it starts again. */
+  renewsOn: string | null;
+  checklist: string[];
+  notes: string[];
+}

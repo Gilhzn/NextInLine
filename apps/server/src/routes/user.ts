@@ -11,6 +11,7 @@ import {
   policyTermPutSchema,
   policyImportApplySchema,
   entitlementEstimateSchema,
+  beforeBookingSchema,
   paymentLeadsSaveSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
@@ -46,6 +47,7 @@ import { grantConsent, revokeConsent } from "../services/consents";
 import { applyPolicyImport, previewPolicyImport } from "../services/policy-import";
 import { entitlementSummary, estimateEntitlements } from "../services/entitlements";
 import { moneyOverview } from "../services/money";
+import { beforeBooking } from "../services/before-booking";
 import { dismissPaymentLead, savePaymentLeads, scanStatement } from "../services/card-scan";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
@@ -219,6 +221,8 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
   app.post("/coverage/estimate", async (req) =>
     estimateEntitlements(deps, auth(req), parse(entitlementEstimateSchema, req.body).items),
   );
+
+  app.post("/before-booking", async (req) => beforeBooking(deps, auth(req), parse(beforeBookingSchema, req.body)));
 
   // Import from Har HaBituach: preview (nothing saved, file discarded), then apply what the user confirmed.
   app.post("/coverage/import", async (req) => {

@@ -22,6 +22,7 @@ const ACTION_TITLE: Record<MoneyAction["type"], string> = {
   capture: "צלמו קבלה",
   lead: "צלמו קבלה",
   benefits: "מה מגיע לנו",
+  plan_visit: "לפני שקובעים תור",
 };
 
 /**
@@ -158,6 +159,8 @@ function go(a: MoneyAction) {
       return router.push("/capture");
     case "benefits":
       return router.push("/entitlements");
+    case "plan_visit":
+      return router.push({ pathname: "/before-booking", params: { memberId: a.memberId, category: a.category } });
   }
 }
 

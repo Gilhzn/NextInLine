@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { router } from "expo-router";
 import { errorMessage } from "../api/client";
-import { useMarkNotificationRead, useNotifications, type NotificationItem } from "../api/hooks";
+import { useMarkNotificationRead, useNotifications, type NotificationItem, notificationScreen } from "../api/hooks";
 import { colors, space, type } from "../theme";
 import { Body, Card, ErrorView, Loading, Screen, Spread } from "../ui";
 
@@ -37,6 +37,7 @@ export default function Notifications() {
     else if (n.data?.receiptId) router.push(`/receipt/${n.data.receiptId}`);
     else if (n.data?.feeId) router.push("/settings");
     else if (n.data?.memberId) router.push(`/member/${n.data.memberId}`);
+    else if (notificationScreen(n.data?.screen)) router.push(notificationScreen(n.data?.screen)!);
   }
 
   if (list.isLoading) return <Loading />;

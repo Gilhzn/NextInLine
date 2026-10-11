@@ -75,6 +75,14 @@ export default function Home() {
               <Body muted>מה פספסנו, מה מחכה לנו ואיפה אפשר לחסוך – לכל אחד במשפחה</Body>
             </Card>
 
+            <Card onPress={() => router.push("/before-booking")}>
+              <Spread>
+                <Body style={{ flex: 1, fontWeight: "700" }}>🗓 לפני שקובעים תור</Body>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+              </Spread>
+              <Body muted>כמה זה יעלה לכם אחרי ההחזרים, איפה הכי משתלם ומה להכין מראש</Body>
+            </Card>
+
             <Card onPress={() => router.push("/entitlements")}>
               <Spread>
                 <Body style={{ flex: 1, fontWeight: "700" }}>📋 כל מה שמגיע לכם – סקירה מלאה</Body>

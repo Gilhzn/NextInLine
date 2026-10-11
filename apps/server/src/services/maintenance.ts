@@ -2,6 +2,7 @@ import { formatILS } from "@magiali/shared";
 import type { Deps } from "../context";
 import { enqueue, registerJobHandler } from "./jobs";
 import { notify } from "./notify";
+import { unusedQuotas } from "./quota";
 
 /** Conservative claim window: policies issued before 11/2020 allow 3 years (newer ones 5). */
 const CLAIM_WINDOW_YEARS = 3;
@@ -50,6 +51,49 @@ export async function warnExpiringReceipts(deps: Deps): Promise<number> {
       });
       sent++;
     }
+  }
+  return sent;
+}
+
+/** Reminder waves before the calendar-year quotas reset: mid-November and early December. */
+const QUOTA_WAVES = [
+  { month: 10, day: 15 },
+  { month: 11, day: 5 },
+];
+
+/**
+ * Towards the end of the year: sessions left in quotas the family actually uses (they reset on January 1st).
+ * One summary notification per household per wave – never a nudge towards care nobody needed.
+ */
+export async function remindUnusedQuotas(deps: Deps): Promise<number> {
+  const now = deps.now();
+  const year = now.getUTCFullYear();
+  const wave = QUOTA_WAVES.findLastIndex(
+    (w) => now.getUTCMonth() > w.month || (now.getUTCMonth() === w.month && now.getUTCDate() >= w.day),
+  );
+  if (wave < 0) return 0;
+  const usedSince = new Date(now.getTime() - 365 * 86_400_000).toISOString().slice(0, 10);
+  const households = await deps.sql`
+    SELECT DISTINCT h.id, h.owner_user_id FROM households h JOIN receipts r ON r.household_id = h.id
+    WHERE r.deleted_at IS NULL AND r.service_date >= ${usedSince}`;
+  let sent = 0;
+  for (const h of households) {
+    const key = `${year}-${wave + 1}`;
+    if (await alreadyNotified(deps, h.ownerUserId as string, "quota_reminder", key)) continue;
+    const quotas = await unusedQuotas(deps, h.id as string, usedSince);
+    if (!quotas.length) continue;
+    const total = quotas.reduce((s, q) => s + q.left * q.valueEachAgorot, 0);
+    const top = quotas
+      .slice(0, 3)
+      .map((q) => `${q.left} ${q.label} ל${q.memberName}`)
+      .join(", ");
+    await notify(deps.sql, now, h.ownerUserId as string, {
+      type: "quota_reminder",
+      title: `⏳ עד סוף השנה מגיעים לכם עוד החזרים של עד ${formatILS(total)}`,
+      body: `נשארו: ${top}${quotas.length > 3 ? " ועוד" : ""}. ב-1 בינואר המכסות מתאפסות – אם צריך ממילא, כדאי לקבוע לפני.`,
+      data: { screen: "/money", key },
+    });
+    sent++;
   }
   return sent;
 }
@@ -119,6 +163,7 @@ registerJobHandler("daily_maintenance", async (deps) => {
   try {
     await warnExpiringReceipts(deps);
     await nudgeSlowPayers(deps);
+    await remindUnusedQuotas(deps);
     await purgeExpiredFiles(deps);
   } finally {
     await enqueue(deps.sql, "daily_maintenance", {}, { runAt: nextMorning(deps.now()) });

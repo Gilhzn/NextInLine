@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Platform, Text } from "react-native";
 import { Redirect, router, Tabs } from "expo-router";
 import * as Notifications from "expo-notifications";
+import { notificationScreen } from "../../api/hooks";
 import { registerForPush } from "../../lib/push";
 import { useAuth } from "../../state/auth";
 import { colors } from "../../theme";
@@ -20,9 +21,10 @@ export default function TabsLayout() {
     if (Platform.OS === "web") return;
     // Tapping a notification opens the claim or receipt it is about.
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { claimId?: string; receiptId?: string };
+      const data = response.notification.request.content.data as { claimId?: string; receiptId?: string; screen?: string };
       if (data.claimId) router.push(`/claim/${data.claimId}`);
       else if (data.receiptId) router.push(`/receipt/${data.receiptId}`);
+      else if (notificationScreen(data.screen)) router.push(notificationScreen(data.screen)!);
     });
     return () => sub.remove();
   }, [token]);
