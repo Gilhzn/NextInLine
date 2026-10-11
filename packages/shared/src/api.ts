@@ -365,6 +365,8 @@ export interface ImportedPolicyDto {
   /** exact = product identified; likely = insurer + product type; generic = insurer only (terms to be entered) */
   match: { planId: string; planName: string; confidence: "exact" | "likely" | "generic" } | null;
   alreadyEnrolled: boolean;
+  /** From the report, when it lists the premium (annual premiums are divided by 12). */
+  monthlyPremiumAgorot: number | null;
 }
 
 export interface PolicyImportPreviewDto {
@@ -382,6 +384,8 @@ export const policyImportApplySchema = z.object({
         policyNumber: z.string().max(40).nullable().optional(),
         startDate: z.iso.date().nullable().optional(),
         endDate: z.iso.date().nullable().optional(),
+        /** Saved once, on the first chosen member: a family policy has one premium. */
+        monthlyPremiumAgorot: z.number().int().min(0).max(10_000_000).nullable().optional(),
       }),
     )
     .min(1)
@@ -580,5 +584,36 @@ export interface BeforeBookingDto {
   /** Set when this year's quota is used up: when it starts again. */
   renewsOn: string | null;
   checklist: string[];
+  notes: string[];
+}
+
+// ---------- Premiums vs. refunds: what each policy costs and what it actually returned ----------
+
+export const premiumPutSchema = z.object({
+  monthlyPremiumAgorot: z.number().int().min(0).max(10_000_000).nullable(),
+});
+
+export interface PremiumPlanDto {
+  planId: string;
+  planName: string;
+  planKind: "shaban" | "private_individual" | "private_group";
+  members: Array<{ memberId: string; memberName: string; monthlyPremiumAgorot: number | null }>;
+  /** Sum of the known monthly premiums; null when none was entered. */
+  monthlyPremiumAgorot: number | null;
+  /** Premiums over the last 12 months (only the months the policy was active). */
+  premiumsAgorot: number | null;
+  refundsAgorot: number;
+  waitingAgorot: number;
+  servicesUsed: string[];
+  servicesCovered: number;
+}
+
+export interface PremiumsDto {
+  from: string;
+  to: string;
+  plans: PremiumPlanDto[];
+  totals: { premiumsAgorot: number; refundsAgorot: number; waitingAgorot: number; plansWithoutPremium: number };
+  /** The same service covered by two private policies for the same person. */
+  overlaps: Array<{ memberName: string; label: string; icon: string; planNames: string[] }>;
   notes: string[];
 }

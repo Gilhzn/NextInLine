@@ -13,6 +13,8 @@ export interface RawPolicy {
   startDate: string | null;
   endDate: string | null;
   insuredName: string | null;
+  /** Monthly premium in agorot, when the report lists one. */
+  monthlyPremiumAgorot?: number | null;
 }
 
 export type PolicyReportInput =
@@ -54,6 +56,7 @@ const OUTPUT_SCHEMA = {
           "start_date",
           "end_date",
           "insured_name",
+          "monthly_premium_ils",
         ],
         properties: {
           insurer: str,
@@ -65,6 +68,10 @@ const OUTPUT_SCHEMA = {
           start_date: { ...str, description: "YYYY-MM-DD" },
           end_date: { ...str, description: "YYYY-MM-DD" },
           insured_name: str,
+          monthly_premium_ils: {
+            anyOf: [{ type: "number" }, { type: "null" }],
+            description: "Premium per month in ILS (divide an annual premium by 12); null if not shown",
+          },
         },
       },
     },
@@ -85,6 +92,7 @@ const outputSchema = z.object({
       start_date: nullableString,
       end_date: nullableString,
       insured_name: nullableString,
+      monthly_premium_ils: z.number().nonnegative().nullable(),
     }),
   ),
 });
@@ -100,6 +108,7 @@ Return every policy row exactly as written; do not judge relevance and do not in
 - policy_number: as printed (מספר פוליסה).
 - start_date / end_date: the insurance period, normalised to YYYY-MM-DD. Israeli dates are written day first. Use null for an open-ended period.
 - insured_name: the insured person's name if shown.
+- monthly_premium_ils: the premium (פרמיה) per month in shekels if shown; divide an annual premium by 12.
 If this is not a Har HaBituach or similar insurance-policy list, set is_policy_report to false and return no policies. Use null for anything you cannot read with reasonable certainty.`;
 
 const isoOrNull = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
@@ -164,6 +173,7 @@ export class ClaudePolicyReader implements PolicyReportReader {
       startDate: isoOrNull(p.start_date),
       endDate: isoOrNull(p.end_date),
       insuredName: p.insured_name,
+      monthlyPremiumAgorot: p.monthly_premium_ils !== null ? Math.round(p.monthly_premium_ils * 100) : null,
     }));
   }
 }

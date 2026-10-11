@@ -157,6 +157,8 @@ export default function Entitlements() {
         ),
       )}
 
+      <Button title="מה שילמנו על הביטוחים מול מה שקיבלנו" icon="💼" variant="secondary" onPress={() => router.push("/premiums")} />
+
       {data.gaps.length > 0 ? (
         <Card>
           <Text style={heading}>🚫 לא מצאנו כיסוי ל:</Text>

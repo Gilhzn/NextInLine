@@ -89,6 +89,14 @@ export default function Money() {
         <Body muted>נמצא תשלומים לרופאים, מכונים וטיפולים שאין עליהם קבלה באפליקציה</Body>
       </Card>
 
+      <Card onPress={() => router.push("/premiums")}>
+        <Spread>
+          <Body style={{ flex: 1, fontWeight: "700" }}>💼 מה הביטוחים נותנים לנו</Body>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+        </Spread>
+        <Body muted>כמה שילמנו על כל ביטוח מול כמה הוא החזיר</Body>
+      </Card>
+
       {BUCKETS.map((b) => {
         const bucket = d[b.key];
         return (

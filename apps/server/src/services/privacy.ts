@@ -12,7 +12,7 @@ export async function exportData(deps: Deps, ctx: AuthContext): Promise<Record<s
     user: await deps.sql`SELECT id, phone_e164, display_name, locale, created_at FROM users WHERE id = ${ctx.userId}`,
     members: await deps.sql`SELECT id, full_name, relation, birth_date, consent_status, created_at FROM members WHERE household_id = ${h}`,
     enrollments: await deps.sql`
-      SELECT e.plan_id, e.is_shaban_supplement, e.created_at FROM enrollments e JOIN members m ON m.id = e.member_id
+      SELECT e.plan_id, e.is_shaban_supplement, e.monthly_premium_agorot, e.created_at FROM enrollments e JOIN members m ON m.id = e.member_id
       WHERE m.household_id = ${h}`,
     paymentLeads: await deps.sql`SELECT merchant, paid_on, amount_agorot, category, status, created_at FROM payment_leads WHERE household_id = ${h}`,
     receipts: await deps.sql`

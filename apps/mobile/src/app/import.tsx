@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Linking, Platform, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ImportedPolicyDto, PolicyImportPreviewDto } from "@magiali/shared";
+import { formatILS, type ImportedPolicyDto, type PolicyImportPreviewDto } from "@magiali/shared";
 import { api, ApiError, errorMessage, upload } from "../api/client";
 import { keys, useMembers } from "../api/hooks";
 import { pickFromLibrary, pickPolicyReport, type LocalFile, type PickResult } from "../lib/media";
@@ -77,6 +77,7 @@ export default function ImportPolicies() {
           policyNumber: p.policyNumber,
           startDate: p.startDate,
           endDate: p.endDate,
+          monthlyPremiumAgorot: p.monthlyPremiumAgorot,
         })),
       });
       await qc.invalidateQueries({ queryKey: keys.members });
@@ -248,6 +249,7 @@ function PolicyLine({ p }: { p: ImportedPolicyDto }) {
       <Body muted>
         {[p.insurer, p.branch, p.product].filter(Boolean).join(" · ")}
         {p.policyNumber ? ` · פוליסה ${p.policyNumber}` : ""}
+        {p.monthlyPremiumAgorot ? ` · ${formatILS(p.monthlyPremiumAgorot)} לחודש` : ""}
       </Body>
       <Row>
         {p.alreadyEnrolled ? <Badge label="כבר אצלך" tone="muted" /> : null}

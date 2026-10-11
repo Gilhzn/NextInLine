@@ -70,6 +70,7 @@ function RootLayout() {
           <Stack.Screen name="money" options={{ headerShown: true, title: "הכסף הבריאותי שלנו" }} />
           <Stack.Screen name="scan-card" options={{ headerShown: true, title: "סריקת פירוט האשראי" }} />
           <Stack.Screen name="before-booking" options={{ headerShown: true, title: "לפני שקובעים תור" }} />
+          <Stack.Screen name="premiums" options={{ headerShown: true, title: "מה הביטוחים נותנים לנו" }} />
           <Stack.Screen name="payment-return" options={{ headerShown: true, title: "אמצעי תשלום" }} />
           <Stack.Screen name="notifications" options={{ headerShown: true, title: "התראות" }} />
         </Stack>}

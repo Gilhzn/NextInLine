@@ -28,10 +28,10 @@ const reportPath = path.join(OUT, "_har-habituach.xlsx");
   const wb = new ExcelJS.Workbook();
   const sheet = wb.addWorksheet("פוליסות");
   sheet.addRow(["הר הביטוח – ריכוז פוליסות"]);
-  sheet.addRow(["ענף ראשי", "ענף (משני)", "סוג מוצר", "חברה", "תקופת ביטוח", "מספר פוליסה", "סיווג תכנית"]);
-  sheet.addRow(["ביטוח בריאות", "כתב שירות", "טיפולים ואבחונים לילד", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "521-778899", "פרט"]);
-  sheet.addRow(["ביטוח בריאות", "ניתוחים בארץ", "ניתוחים", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "800-1", "פרט"]);
-  sheet.addRow(["ביטוח חיים", "ריסק", "ריסק", "מגדל", "01/01/2019 - ", "R-1", "פרט"]);
+  sheet.addRow(["ענף ראשי", "ענף (משני)", "סוג מוצר", "חברה", "תקופת ביטוח", "מספר פוליסה", "סיווג תכנית", "פרמיה", "סוג פרמיה"]);
+  sheet.addRow(["ביטוח בריאות", "כתב שירות", "טיפולים ואבחונים לילד", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "521-778899", "פרט", "45.90", "חודשית"]);
+  sheet.addRow(["ביטוח בריאות", "ניתוחים בארץ", "ניתוחים", "הראל חברה לביטוח בע\"מ", "01/01/2022 - ", "800-1", "פרט", "62.10", "חודשית"]);
+  sheet.addRow(["ביטוח חיים", "ריסק", "ריסק", "מגדל", "01/01/2019 - ", "R-1", "פרט", "88.00", "חודשית"]);
   await wb.xlsx.writeFile(reportPath);
 }
 // A credit card statement (Isracard-style export) with one doctor's visit that has no receipt in the app.
@@ -288,6 +288,17 @@ await see("הכי משתלם");
 await see("מה להכין");
 await vis(page.getByText("הכי משתלם")).first().scrollIntoViewIfNeeded();
 await shot("before-booking");
+
+// Premiums vs. refunds: Harel's premium came from the Har HaBituach report; the shaban's is typed in.
+await page.goto(`${BASE_URL}/premiums`);
+await see("מה הביטוחים נותנים לנו");
+await see("שילמנו על ביטוחים");
+await see(/45\.90/);
+await vis(page.getByPlaceholder("למשל 120")).first().fill("35");
+await click("שמירה");
+await see(/35 ₪ לחודש|₪35 לחודש|35\.00/);
+await see("לא ייעוץ ולא המלצה");
+await shot("premiums");
 
 for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
   await page.goto(`${BASE_URL}/legal/${doc}`);

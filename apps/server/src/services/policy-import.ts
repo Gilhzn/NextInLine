@@ -5,6 +5,7 @@ import { AppError } from "../errors";
 import type { RawPolicy } from "../policy-reader";
 import { audit } from "./audit";
 import { hasConsent } from "./consents";
+import { parseAmount } from "./card-scan";
 import { getMemberForHousehold } from "./households";
 
 /**
@@ -32,7 +33,7 @@ export function sniff(data: Buffer): Sniffed {
 // ---------- spreadsheet → rows ----------
 
 /** Header synonyms seen on Har HaBituach and insurers' reports. Matched after normalising spaces and quotes. */
-const COLUMNS: Record<keyof RawPolicy | "period", string[]> = {
+const COLUMNS: Record<keyof RawPolicy | "period" | "premiumType", string[]> = {
   insurer: ["חברה", "חברת ביטוח", "שם חברה", "חברה מנהלת", "גוף מוסדי", "מבטח"],
   mainBranch: ["ענף ראשי", "ענף", "תחום", "תחום ראשי", "סוג ביטוח"],
   subBranch: ["ענף משני", "ענף (משני)", "תחום משני", "כיסוי", "סוג כיסוי"],
@@ -43,6 +44,9 @@ const COLUMNS: Record<keyof RawPolicy | "period", string[]> = {
   startDate: ["תאריך תחילה", "תחילת ביטוח", "תאריך תחילת ביטוח", "מתאריך"],
   endDate: ["תאריך סיום", "סיום ביטוח", "תאריך סיום ביטוח", "עד תאריך"],
   insuredName: ["שם המבוטח", "מבוטח", "שם מבוטח"],
+  // Before the premium itself, so "סוג פרמיה" isn't read as the amount.
+  premiumType: ["סוג פרמיה", "תדירות תשלום", "תדירות פרמיה", "אופן תשלום"],
+  monthlyPremiumAgorot: ["פרמיה חודשית", "פרמיה", "פרמיה בש\"ח", "פרמיה חודשית בש\"ח", "סכום פרמיה", "דמי ביטוח"],
 };
 
 const norm = (s: string) =>
@@ -91,6 +95,13 @@ function cellText(v: ExcelJS.CellValue): string | Date {
   return String(v);
 }
 
+/** "₪120.50" per month, or per year when the report says so (divided by 12). */
+function premium(value: string | Date | undefined, period: string | null): number | null {
+  const ils = parseAmount(value);
+  if (ils === null || ils <= 0) return null;
+  return Math.round((period && norm(period).includes("שנת") ? ils / 12 : ils) * 100);
+}
+
 /** Finds the header row (the first row naming at least two known columns) and maps the rows below it. */
 export function rowsToPolicies(table: Array<Array<string | Date>>): RawPolicy[] | null {
   const headerIndex = table.findIndex((row) => new Set(row.map((c) => headerField(String(c))).filter(Boolean)).size >= 2);
@@ -119,6 +130,7 @@ export function rowsToPolicies(table: Array<Array<string | Date>>): RawPolicy[] 
       startDate: toIsoDate(raw.startDate) ?? period.startDate,
       endDate: toIsoDate(raw.endDate) ?? period.endDate,
       insuredName: text("insuredName"),
+      monthlyPremiumAgorot: premium(raw.monthlyPremiumAgorot, text("premiumType")),
     });
   }
   return policies;
@@ -316,6 +328,7 @@ export async function previewPolicyImport(deps: Deps, ctx: AuthContext, data: Bu
       reason: c.reason,
       match: m && name ? { planId: m.planId, planName: name, confidence: m.confidence } : null,
       alreadyEnrolled: !!m && enrolled.has(m.planId),
+      monthlyPremiumAgorot: p.monthlyPremiumAgorot ?? null,
     };
   });
 
@@ -334,7 +347,10 @@ export async function previewPolicyImport(deps: Deps, ctx: AuthContext, data: Bu
 export async function applyPolicyImport(
   deps: Deps,
   ctx: AuthContext,
-  input: { memberIds: string[]; items: Array<{ planId: string; policyNumber?: string | null; startDate?: string | null; endDate?: string | null }> },
+  input: {
+    memberIds: string[];
+    items: Array<{ planId: string; policyNumber?: string | null; startDate?: string | null; endDate?: string | null; monthlyPremiumAgorot?: number | null }>;
+  },
 ): Promise<{ added: number; updated: number }> {
   for (const memberId of input.memberIds) await getMemberForHousehold(deps.sql, ctx.householdId, memberId);
   const planIds = [...new Set(input.items.map((i) => i.planId))];
@@ -348,15 +364,19 @@ export async function applyPolicyImport(
   let added = 0;
   let updated = 0;
   await deps.sql.begin(async (tx) => {
-    for (const memberId of input.memberIds) {
+    for (const [index, memberId] of input.memberIds.entries()) {
       for (const item of input.items) {
+        // A family policy has one premium: kept on the first chosen member so it is counted once.
+        const premium = index === 0 ? (item.monthlyPremiumAgorot ?? null) : null;
         const [row] = await tx`
-          INSERT INTO enrollments (member_id, plan_id, is_shaban_supplement, policy_number_enc, source, valid_from, valid_to)
+          INSERT INTO enrollments (member_id, plan_id, is_shaban_supplement, policy_number_enc, source, valid_from, valid_to,
+                                   monthly_premium_agorot)
           VALUES (${memberId}, ${item.planId}, false,
                   ${item.policyNumber ? deps.crypto.encryptString(item.policyNumber) : null}, 'har_habituach',
-                  ${item.startDate ?? "2000-01-01"}, ${item.endDate ?? null})
+                  ${item.startDate ?? "2000-01-01"}, ${item.endDate ?? null}, ${premium})
           ON CONFLICT (member_id, plan_id) DO UPDATE SET
             policy_number_enc = COALESCE(EXCLUDED.policy_number_enc, enrollments.policy_number_enc),
+            monthly_premium_agorot = COALESCE(EXCLUDED.monthly_premium_agorot, enrollments.monthly_premium_agorot),
             source = 'har_habituach',
             valid_from = CASE WHEN ${item.startDate ?? null}::date IS NULL THEN enrollments.valid_from ELSE EXCLUDED.valid_from END,
             valid_to = CASE WHEN ${item.endDate ?? null}::date IS NULL THEN enrollments.valid_to ELSE EXCLUDED.valid_to END

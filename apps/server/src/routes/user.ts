@@ -12,6 +12,7 @@ import {
   policyImportApplySchema,
   entitlementEstimateSchema,
   beforeBookingSchema,
+  premiumPutSchema,
   paymentLeadsSaveSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
@@ -48,6 +49,7 @@ import { applyPolicyImport, previewPolicyImport } from "../services/policy-impor
 import { entitlementSummary, estimateEntitlements } from "../services/entitlements";
 import { moneyOverview } from "../services/money";
 import { beforeBooking } from "../services/before-booking";
+import { premiumsOverview, setPremium } from "../services/premiums";
 import { dismissPaymentLead, savePaymentLeads, scanStatement } from "../services/card-scan";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
@@ -174,6 +176,15 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
     await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "policy_terms_set", entity: "enrollment", entityId: `${id}:${planId}`, meta: { category: input.category } });
     return getPolicyTerms(deps.sql, ctx.householdId, id, planId);
   });
+
+  app.put<{ Params: { id: string; planId: string } }>("/members/:id/enrollments/:planId/premium", async (req, reply) => {
+    const { id } = parse(idParam, { id: req.params.id });
+    const planId = parse(z.string().max(60), req.params.planId);
+    await setPremium(deps, auth(req), id, planId, parse(premiumPutSchema, req.body).monthlyPremiumAgorot);
+    return reply.status(204).send();
+  });
+
+  app.get("/premiums", async (req) => premiumsOverview(deps, auth(req)));
 
   app.get("/members/:id/enrollments", async (req) => {
     const { id } = parse(idParam, req.params);
