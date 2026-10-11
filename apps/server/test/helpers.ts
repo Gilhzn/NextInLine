@@ -1,5 +1,6 @@
 import { useTestCatalog } from "./catalog.fixture";
 import type { PolicyReportReader, RawPolicy } from "../src/policy-reader";
+import type { RawTransaction, StatementReader } from "../src/statement-reader";
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import type { ExtractedFields } from "@magiali/shared";
@@ -49,6 +50,14 @@ export class FakePolicyReader implements PolicyReportReader {
   }
 }
 
+export class FakeStatementReader implements StatementReader {
+  readonly name = "fake";
+  next: RawTransaction[] = [];
+  async read(): Promise<RawTransaction[]> {
+    return this.next;
+  }
+}
+
 export interface TestEnv {
   app: FastifyInstance;
   deps: Deps;
@@ -59,6 +68,7 @@ export interface TestEnv {
   payments: MockPayments;
   extractor: FakeExtractor;
   policyReader: FakePolicyReader;
+  statementReader: FakeStatementReader;
   clock: { readonly now: Date; advanceDays(days: number): void };
   runJobs(): Promise<number>;
   close(): Promise<void>;
@@ -104,6 +114,7 @@ export async function createTestEnv(): Promise<TestEnv> {
   const payments = new MockPayments();
   const extractor = new FakeExtractor();
   const policyReader = new FakePolicyReader();
+  const statementReader = new FakeStatementReader();
   const deps: Deps = {
     config,
     sql,
@@ -115,6 +126,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     email,
     extractor,
     policyReader,
+    statementReader,
     now: () => clock.now,
   };
   const app = await buildApp(deps);
@@ -129,6 +141,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     payments,
     extractor,
     policyReader,
+    statementReader,
     clock,
     async runJobs() {
       let total = 0;

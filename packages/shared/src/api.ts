@@ -430,3 +430,98 @@ export interface EntitlementEstimateDto {
   items: Array<{ memberId: string; category: BenefitCategory; visits: number; priceAgorot: number; refundAgorot: number }>;
   totalAgorot: number;
 }
+
+// ---------- "Our health money": what we paid, got back, missed, are owed, and can still save ----------
+
+export type MoneyAction =
+  | { type: "claim"; id: string }
+  | { type: "receipt"; id: string }
+  | { type: "policy"; memberId: string; planId: string }
+  | { type: "capture" }
+  | { type: "lead"; id: string }
+  | { type: "benefits" };
+
+export interface MoneyItemDto {
+  kind:
+    | "unclaimed_receipt"
+    | "receipt_needs_details"
+    | "payment_without_receipt"
+    | "rejected"
+    | "in_flight"
+    | "ready_to_submit"
+    | "missing_documents"
+    | "unused_quota"
+    | "uncovered_spend"
+    | "low_refund"
+    | "missing_terms";
+  title: string;
+  detail: string | null;
+  /** The money at stake (an estimate where marked by the kind), or null when unknown. */
+  amountAgorot: number | null;
+  urgent: boolean;
+  action: MoneyAction | null;
+}
+
+export interface MoneyServiceDto {
+  memberId: string;
+  memberName: string;
+  category: BenefitCategory;
+  label: string;
+  icon: string;
+  visits: number;
+  paidAgorot: number;
+  refundedAgorot: number;
+  waitingAgorot: number;
+  /** Estimated refund on receipts not yet claimed. */
+  unclaimedAgorot: number;
+  covered: boolean;
+}
+
+export interface MoneyDto {
+  range: "year" | "3y";
+  from: string;
+  to: string;
+  paidAgorot: number;
+  refundedAgorot: number;
+  waitingAgorot: number;
+  missed: { totalAgorot: number; items: MoneyItemDto[] };
+  waiting: { totalAgorot: number; items: MoneyItemDto[] };
+  save: { totalAgorot: number; items: MoneyItemDto[] };
+  services: MoneyServiceDto[];
+}
+
+// ---------- Credit card statement scan: medical payments that may still be refundable ----------
+
+export interface StatementCandidateDto {
+  key: string;
+  merchant: string;
+  date: string;
+  amountAgorot: number;
+  category: BenefitCategory | null;
+  categoryLabel: string | null;
+  /** A receipt with the same amount and a close date is already in the app. */
+  hasReceipt: boolean;
+  alreadySaved: boolean;
+  estimatedRefundAgorot: number | null;
+}
+
+export interface StatementScanDto {
+  source: "spreadsheet" | "ai";
+  rowsScanned: number;
+  candidates: StatementCandidateDto[];
+  notes: string[];
+}
+
+export const paymentLeadsSaveSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        merchant: z.string().trim().min(1).max(120),
+        date: z.iso.date(),
+        amountAgorot: z.number().int().positive().max(100_000_000),
+        category: z.enum(BENEFIT_CATEGORIES).nullable(),
+      }),
+    )
+    .min(1)
+    .max(100),
+});

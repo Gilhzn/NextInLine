@@ -14,6 +14,7 @@ export async function exportData(deps: Deps, ctx: AuthContext): Promise<Record<s
     enrollments: await deps.sql`
       SELECT e.plan_id, e.is_shaban_supplement, e.created_at FROM enrollments e JOIN members m ON m.id = e.member_id
       WHERE m.household_id = ${h}`,
+    paymentLeads: await deps.sql`SELECT merchant, paid_on, amount_agorot, category, status, created_at FROM payment_leads WHERE household_id = ${h}`,
     receipts: await deps.sql`
       SELECT id, member_id, category, provider_name, service_date, amount_agorot, sessions, extraction_status, created_at
       FROM receipts WHERE household_id = ${h}`,
@@ -68,6 +69,7 @@ registerJobHandler("purge_deleted_user", async (deps, payload) => {
     await tx`
       UPDATE members SET full_name = 'נמחק', birth_date = NULL, consent_phone_e164 = NULL, deleted_at = COALESCE(deleted_at, ${deps.now()})
       WHERE household_id = ${householdId}`;
+    await tx`DELETE FROM payment_leads WHERE household_id = ${householdId}`;
     await tx`DELETE FROM enrollments WHERE member_id IN (SELECT id FROM members WHERE household_id = ${householdId})`;
     await tx`DELETE FROM notifications WHERE user_id = ${payload.userId as string}`;
     await tx`DELETE FROM otp_challenges WHERE member_id IN (SELECT id FROM members WHERE household_id = ${householdId})`;

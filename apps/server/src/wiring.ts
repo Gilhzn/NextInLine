@@ -4,6 +4,7 @@ import { Crypto } from "./crypto";
 import type { Sql } from "./db";
 import { ClaudeExtractor, ManualExtractor } from "./extraction";
 import { ClaudePolicyReader, ManualPolicyReader } from "./policy-reader";
+import { ClaudeStatementReader, ManualStatementReader } from "./statement-reader";
 import { ConsoleEmail, ConsoleSms, ExpoPushProvider, LocalDiskStorage, MockPayments } from "./providers";
 import { CardcomPayments, ResendEmail, S3Storage, TwilioSms } from "./providers.production";
 
@@ -68,6 +69,8 @@ export function createDeps(config: Config, sql: Sql): { deps: Deps; summary: Pro
     email,
     extractor,
     policyReader: config.extractionProvider === "claude" ? new ClaudePolicyReader(config.ANTHROPIC_API_KEY) : new ManualPolicyReader(),
+    statementReader:
+      config.extractionProvider === "claude" ? new ClaudeStatementReader(config.ANTHROPIC_API_KEY) : new ManualStatementReader(),
     now: () => new Date(),
   };
 

@@ -67,6 +67,8 @@ function RootLayout() {
           <Stack.Screen name="policy/[memberId]/[planId]" options={{ headerShown: true, title: "תנאי הביטוח" }} />
           <Stack.Screen name="entitlements" options={{ headerShown: true, title: "כל מה שמגיע לכם" }} />
           <Stack.Screen name="import" options={{ headerShown: true, title: "ייבוא מהר הביטוח" }} />
+          <Stack.Screen name="money" options={{ headerShown: true, title: "הכסף הבריאותי שלנו" }} />
+          <Stack.Screen name="scan-card" options={{ headerShown: true, title: "סריקת פירוט האשראי" }} />
           <Stack.Screen name="payment-return" options={{ headerShown: true, title: "אמצעי תשלום" }} />
           <Stack.Screen name="notifications" options={{ headerShown: true, title: "התראות" }} />
         </Stack>}

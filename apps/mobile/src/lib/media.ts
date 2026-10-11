@@ -82,3 +82,6 @@ export function uploadReceipt(file: LocalFile, memberId?: string): Promise<Recei
 export function uploadDocument(file: LocalFile, kind: string): Promise<{ id: string; kind: string }> {
   return upload<{ id: string; kind: string }>("/v1/documents", file, { kind });
 }
+
+/** A credit card statement as downloaded from the card company's site: Excel, CSV, PDF, or a screenshot. */
+export const pickStatement = pickPolicyReport;

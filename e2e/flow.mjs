@@ -34,6 +34,19 @@ const reportPath = path.join(OUT, "_har-habituach.xlsx");
   sheet.addRow(["ביטוח חיים", "ריסק", "ריסק", "מגדל", "01/01/2019 - ", "R-1", "פרט"]);
   await wb.xlsx.writeFile(reportPath);
 }
+// A credit card statement (Isracard-style export) with one doctor's visit that has no receipt in the app.
+const statementPath = path.join(OUT, "_card-statement.xlsx");
+{
+  const wb = new ExcelJS.Workbook();
+  const sheet = wb.addWorksheet("עסקאות");
+  const d = (days) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10).split("-").reverse().join("/");
+  sheet.addRow(["פירוט עסקאות לכרטיס 1234"]);
+  sheet.addRow(["תאריך עסקה", "שם בית העסק", "קטגוריה", "סכום חיוב"]);
+  sheet.addRow([d(20), 'ד"ר כהן רופא עור', "רפואה ובריאות", "600.00"]);
+  sheet.addRow([d(21), "שופרסל דיל", "מזון", "312.40"]);
+  sheet.addRow([d(25), "סופר-פארם", "רפואה ובריאות", "89.90"]);
+  await wb.xlsx.writeFile(statementPath);
+}
 await receiptPage.screenshot({ path: receiptPath, fullPage: true });
 await receiptPage.close();
 
@@ -241,6 +254,25 @@ await vis(page.getByLabel("כמה פעמים")).first().fill("12");
 await click("חשבו לי");
 await see("בערך מחכים לכם");
 await shot("entitlements");
+
+// Our health money: scan the card statement, keep the doctor's payment as a reminder, see it under "missed".
+await page.goto(`${BASE_URL}/money`);
+await see("הכסף הבריאותי שלנו");
+await see("מחכה לנו");
+await click(/סריקת פירוט כרטיס האשראי/);
+await see("איך מורידים את הפירוט");
+const statementChooser = page.waitForEvent("filechooser");
+await click("העלאת קובץ הפירוט");
+await (await statementChooser).setFiles(statementPath);
+await see("מצאנו 1 תשלומים רפואיים בלי קבלה.");
+await see('ד"ר כהן רופא עור');
+await shot("card-scan");
+await click(/שמור 1 ותזכיר לי/);
+await see("שמרנו 1 תשלומים");
+await click("לכסף הבריאותי שלנו");
+await see(/שילמתם לד"ר כהן רופא עור/);
+await see("🩺 השירותים שלנו");
+await shot("health-money");
 
 for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
   await page.goto(`${BASE_URL}/legal/${doc}`);

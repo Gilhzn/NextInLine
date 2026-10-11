@@ -11,6 +11,7 @@ import {
   policyTermPutSchema,
   policyImportApplySchema,
   entitlementEstimateSchema,
+  paymentLeadsSaveSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
   meUpdateSchema,
@@ -44,6 +45,8 @@ import { refreshCardSetup, startCardSetup } from "../services/payments";
 import { grantConsent, revokeConsent } from "../services/consents";
 import { applyPolicyImport, previewPolicyImport } from "../services/policy-import";
 import { entitlementSummary, estimateEntitlements } from "../services/entitlements";
+import { moneyOverview } from "../services/money";
+import { dismissPaymentLead, savePaymentLeads, scanStatement } from "../services/card-scan";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
 import { getMe, getMemberForHousehold, listMembers, memberDto } from "../services/households";
@@ -196,6 +199,19 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
       kind: r.planKind as PlanDto["kind"],
       description: (r.description as string | null) ?? null,
     }));
+  });
+
+  // "Our health money": paid, got back, missed, on its way, and where we can still save.
+  app.get<{ Querystring: { range?: string } }>("/money", async (req) =>
+    moneyOverview(deps, auth(req), req.query.range === "3y" ? "3y" : "year"),
+  );
+
+  // Credit card statement scan: medical payments that may still be refundable (the file is not kept).
+  app.post("/statement-scan", async (req) => scanStatement(deps, auth(req), (await readUpload(req)).data));
+  app.post("/payment-leads", async (req) => savePaymentLeads(deps, auth(req), parse(paymentLeadsSaveSchema, req.body).items));
+  app.post("/payment-leads/:id/dismiss", async (req, reply) => {
+    await dismissPaymentLead(deps, auth(req), parse(idParam, req.params).id);
+    return reply.code(204).send();
   });
 
   // Everything the household can get back, and an estimate of what may be waiting from the last 3 years.

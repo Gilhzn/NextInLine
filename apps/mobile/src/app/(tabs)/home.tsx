@@ -67,7 +67,15 @@ export default function Home() {
               ) : null}
             </Card>
 
-            <Card onPress={() => router.push("/entitlements")} style={{ marginTop: space.md }}>
+            <Card tone="primary" onPress={() => router.push("/money")} style={{ marginTop: space.md }}>
+              <Spread>
+                <Body style={{ flex: 1, fontWeight: "700" }}>💰 הכסף הבריאותי שלנו</Body>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+              </Spread>
+              <Body muted>מה פספסנו, מה מחכה לנו ואיפה אפשר לחסוך – לכל אחד במשפחה</Body>
+            </Card>
+
+            <Card onPress={() => router.push("/entitlements")}>
               <Spread>
                 <Body style={{ flex: 1, fontWeight: "700" }}>📋 כל מה שמגיע לכם – סקירה מלאה</Body>
                 <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
