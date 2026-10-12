@@ -85,7 +85,7 @@ export async function remindUnusedQuotas(deps: Deps): Promise<number> {
     const total = quotas.reduce((s, q) => s + q.left * q.valueEachAgorot, 0);
     const top = quotas
       .slice(0, 3)
-      .map((q) => `${q.left} ${q.label} ל${q.memberName}`)
+      .map((q) => `${q.left} מפגשי ${q.label} ל${q.memberName}`)
       .join(", ");
     await notify(deps.sql, now, h.ownerUserId as string, {
       type: "quota_reminder",

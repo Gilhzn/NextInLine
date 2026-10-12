@@ -162,6 +162,8 @@ await shot("agreements");
 await click("סיימנו, בוא נתחיל");
 
 await see("החזרנו לכם השנה");
+await see("מה עושים עכשיו");
+await see("איפה עוד מסתתר כסף?");
 await see("קבלה מחכה לאישור פרטים");
 await shot("home");
 
@@ -256,7 +258,13 @@ await see("בערך מחכים לכם");
 await shot("entitlements");
 
 // Our health money: scan the card statement, keep the doctor's payment as a reminder, see it under "missed".
-await page.goto(`${BASE_URL}/money`);
+// The home screen is the money map: one number, three tiles, the next steps. A tile opens just its list.
+await page.goto(`${BASE_URL}/home`);
+await see(/מחכים לכם בערך|החזרנו לכם השנה/);
+await shot("home-money-map");
+await vis(page.getByRole("button", { name: /^פספסנו/ })).first().click();
+await see("להציג את כל הכסף שלנו");
+await click("להציג את כל הכסף שלנו");
 await see("הכסף הבריאותי שלנו");
 await see("מחכה לנו");
 await click(/סריקת פירוט כרטיס האשראי/);

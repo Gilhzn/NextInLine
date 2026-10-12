@@ -106,7 +106,7 @@ describe("year-end quota reminders", () => {
     expect(sent).toHaveLength(1);
     // 12 physiotherapy sessions a year, ₪60 back for each.
     expect(sent[0]!.title).toContain("720");
-    expect(sent[0]!.body).toContain("12 פיזיותרפיה");
+    expect(sent[0]!.body).toContain("12 מפגשי פיזיותרפיה");
     expect(sent[0]!.data).toMatchObject({ screen: "/money" });
 
     // Second wave in December.

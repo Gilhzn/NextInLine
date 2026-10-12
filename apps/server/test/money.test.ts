@@ -76,6 +76,12 @@ describe("our health money", () => {
     expect(specialist).toMatchObject({ visits: 1, paidAgorot: 65000, refundedAgorot: 0, unclaimedAgorot: 25000, covered: true });
     expect(money.services.find((x: any) => x.category === "dental")).toMatchObject({ covered: false, paidAgorot: 80000 });
 
+    // Next steps: the receipt about to expire first, never a claim that only needs patience.
+    expect(money.nextSteps[0]).toMatchObject({ kind: "unclaimed_receipt", urgent: true });
+    expect(money.nextSteps.length).toBeLessThanOrEqual(4);
+    expect(money.nextSteps.some((i: any) => i.kind === "in_flight")).toBe(false);
+    expect(money.discovery).toEqual({ receipts: 5, policiesImported: false, cardScanned: false, premiumsEntered: false });
+
     // The last 3 years include the old receipt too.
     const three = expectStatus(await user.get("/v1/money?range=3y"), 200);
     expect(three.paidAgorot).toBe(money.paidAgorot + 40000);
@@ -133,6 +139,7 @@ describe("credit card statement scan", () => {
       200,
     );
     expect(scan.source).toBe("spreadsheet");
+    expect(expectStatus(await user.get("/v1/money"), 200).discovery.cardScanned).toBe(true);
     expect(scan.rowsScanned).toBe(7);
     expect(scan.candidates.map((c: any) => c.merchant)).toEqual(['ד"ר לוי אורתופד', "קלינאית תקשורת שירה", "מכון פיזיו פלוס"]);
     const [doctor, clinician, physio] = scan.candidates;

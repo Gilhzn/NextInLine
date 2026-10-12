@@ -493,6 +493,10 @@ export interface MoneyDto {
   waiting: { totalAgorot: number; items: MoneyItemDto[] };
   save: { totalAgorot: number; items: MoneyItemDto[] };
   services: MoneyServiceDto[];
+  /** The few things worth doing now, most urgent and most money first (from missed, waiting and save). */
+  nextSteps: MoneyItemDto[];
+  /** Where money may still be hiding: the discovery steps this family has (not) done. */
+  discovery: { receipts: number; policiesImported: boolean; cardScanned: boolean; premiumsEntered: boolean };
 }
 
 // ---------- Credit card statement scan: medical payments that may still be refundable ----------

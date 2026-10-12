@@ -66,7 +66,7 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
       if (r.extractionStatus === "pending" || r.extractionStatus === "processing") continue;
       missed.push({
         kind: "receipt_needs_details",
-        title: "קבלה שמחכה לפרטים",
+        title: "🧾 קבלה מחכה לאישור פרטים",
         detail: [r.providerName, r.amountAgorot ? `שולם ${formatILS(r.amountAgorot as number)}` : null].filter(Boolean).join(" · ") || null,
         amountAgorot: null,
         urgent: false,
@@ -215,7 +215,7 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
   for (const q of await unusedQuotas(deps, ctx.householdId, from)) {
     save.push({
       kind: "unused_quota",
-      title: `${q.icon} נשארו ל${q.memberName} ${q.left} ${q.label} עד ${yearEnd}`,
+      title: `${q.icon} נשארו ל${q.memberName} ${q.left} מפגשי ${q.label} עד ${yearEnd}`,
       detail: `${q.planName} · בערך ${formatILS(q.valueEachAgorot)} החזר לכל אחד`,
       amountAgorot: q.valueEachAgorot * q.left,
       urgent: now.getUTCMonth() >= 9,
@@ -268,6 +268,23 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
   waiting.sort(order);
   save.sort(order);
 
+  // Next steps: things the user can act on now. "In flight" claims only need patience.
+  const NOT_ACTIONABLE = new Set<MoneyItemDto["kind"]>(["in_flight", "uncovered_spend", "low_refund"]);
+  // Money already paid out comes before future savings; within each, urgent first, then the bigger amount.
+  const nextSteps = [...[...missed, ...waiting].sort(order), ...save.filter((i) => i.amountAgorot)]
+    .filter((i) => !NOT_ACTIONABLE.has(i.kind) && i.action)
+    .slice(0, 4);
+
+  const [found] = await deps.sql`
+    SELECT
+      (SELECT count(*)::int FROM receipts WHERE household_id = ${ctx.householdId} AND deleted_at IS NULL) AS receipts,
+      EXISTS (SELECT 1 FROM enrollments e JOIN members m ON m.id = e.member_id
+              WHERE m.household_id = ${ctx.householdId} AND e.source = 'har_habituach') AS imported,
+      EXISTS (SELECT 1 FROM audit_log WHERE entity = 'household' AND entity_id = ${ctx.householdId}::text
+              AND action = 'card_statement_scanned') AS scanned,
+      EXISTS (SELECT 1 FROM enrollments e JOIN members m ON m.id = e.member_id
+              WHERE m.household_id = ${ctx.householdId} AND e.monthly_premium_agorot IS NOT NULL) AS premiums`;
+
   return {
     range,
     from,
@@ -279,5 +296,12 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
     waiting: { totalAgorot: sum(waiting), items: waiting },
     save: { totalAgorot: sum(save), items: save },
     services: serviceList,
+    nextSteps,
+    discovery: {
+      receipts: found!.receipts as number,
+      policiesImported: found!.imported as boolean,
+      cardScanned: found!.scanned as boolean,
+      premiumsEntered: found!.premiums as boolean,
+    },
   };
 }

@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatILS, type MoneyAction, type MoneyDto, type MoneyItemDto, type MoneyServiceDto } from "@magiali/shared";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { formatILS, type MoneyDto, type MoneyServiceDto } from "@magiali/shared";
 import { api, errorMessage } from "../api/client";
 import { colors, radius, space, type } from "../theme";
 import { Badge, Body, Button, Card, Chip, ErrorView, Loading, Row, Screen, Spread, Title } from "../ui";
+import { MoneyItemCard } from "../ui/MoneyItem";
 
 type Range = MoneyDto["range"];
 
@@ -15,22 +16,14 @@ const BUCKETS = [
   { key: "save", icon: "🔵", title: "אפשר לחסוך", sub: "הטבות שמגיעות לכם ועוד לא ניצלתם", empty: "אין המלצות כרגע", color: colors.primary, soft: colors.primarySoft },
 ] as const;
 
-const ACTION_TITLE: Record<MoneyAction["type"], string> = {
-  claim: "לתביעה",
-  receipt: "לקבלה",
-  policy: "להזנת התנאים",
-  capture: "צלמו קבלה",
-  lead: "צלמו קבלה",
-  benefits: "מה מגיע לנו",
-  plan_visit: "לפני שקובעים תור",
-};
-
 /**
  * "Our health money": one screen that answers where the family's health money went, what we missed, what is on its
  * way and where we can save – by person and by service. Information only: we never advise buying or cancelling insurance.
  */
 export default function Money() {
-  const qc = useQueryClient();
+  // Opened from a tile on the home screen: that bucket only, the rest one tap away.
+  const params = useLocalSearchParams<{ bucket?: string }>();
+  const [focus, setFocus] = useState(BUCKETS.find((b) => b.key === params.bucket)?.key ?? null);
   const [range, setRange] = useState<Range>("year");
   const [openServices, setOpenServices] = useState(false);
   const money = useQuery({ queryKey: ["money", range], queryFn: () => api<MoneyDto>("GET", `/v1/money?range=${range}`) });
@@ -42,11 +35,6 @@ export default function Money() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
-
-  async function dismiss(id: string) {
-    await api("POST", `/v1/payment-leads/${id}/dismiss`);
-    await qc.invalidateQueries({ queryKey: ["money"] });
-  }
 
   if (money.isLoading) return <Loading />;
   if (money.error || !money.data) return <Screen><ErrorView message={errorMessage(money.error)} onRetry={() => void money.refetch()} /></Screen>;
@@ -81,23 +69,10 @@ export default function Money() {
         )}
       </Card>
 
-      <Card tone="primary" onPress={() => router.push("/scan-card")}>
-        <Spread>
-          <Body style={{ flex: 1, fontWeight: "700" }}>💳 סריקת פירוט כרטיס האשראי</Body>
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
-        </Spread>
-        <Body muted>נמצא תשלומים לרופאים, מכונים וטיפולים שאין עליהם קבלה באפליקציה</Body>
-      </Card>
-
-      <Card onPress={() => router.push("/premiums")}>
-        <Spread>
-          <Body style={{ flex: 1, fontWeight: "700" }}>💼 מה הביטוחים נותנים לנו</Body>
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
-        </Spread>
-        <Body muted>כמה שילמנו על כל ביטוח מול כמה הוא החזיר</Body>
-      </Card>
-
-      {BUCKETS.map((b) => {
+      {focus ? (
+        <Button title="להציג את כל הכסף שלנו" variant="ghost" onPress={() => setFocus(null)} />
+      ) : null}
+      {BUCKETS.filter((b) => !focus || b.key === focus).map((b) => {
         const bucket = d[b.key];
         return (
           <View key={b.key} style={{ marginTop: space.md }}>
@@ -113,29 +88,49 @@ export default function Money() {
                 <Body muted>{b.empty}</Body>
               </Card>
             ) : (
-              bucket.items.map((item, i) => <Item key={`${item.kind}-${i}`} item={item} color={b.color} onDismiss={dismiss} />)
+              bucket.items.map((item, i) => <MoneyItemCard key={`${item.kind}-${i}`} item={item} color={b.color} />)
             )}
           </View>
         );
       })}
 
+      {focus ? null : (
+        <View style={{ marginTop: space.lg }}>
+          <Text style={{ fontSize: type.title - 2, fontWeight: "800", color: colors.text }}>🩺 השירותים שלנו</Text>
+          <Body muted>לכל אחד במשפחה: על מה שילמנו, כמה חזר ומה עוד אפשר לקבל</Body>
+          {d.services.length === 0 ? (
+            <Card>
+              <Body muted>יופיע כאן אחרי שתצלמו קבלות.</Body>
+            </Card>
+          ) : (
+            <>
+              {(openServices ? d.services : d.services.slice(0, 5)).map((s) => (
+                <ServiceRow key={`${s.memberId}-${s.category}`} s={s} showName={new Set(d.services.map((x) => x.memberId)).size > 1} />
+              ))}
+              {d.services.length > 5 ? (
+                <Button title={openServices ? "פחות" : `עוד ${d.services.length - 5} שירותים`} variant="ghost" onPress={() => setOpenServices((v) => !v)} />
+              ) : null}
+            </>
+          )}
+        </View>
+      )}
+
       <View style={{ marginTop: space.lg }}>
-        <Text style={{ fontSize: type.title - 2, fontWeight: "800", color: colors.text }}>🩺 השירותים שלנו</Text>
-        <Body muted>לכל אחד במשפחה: על מה שילמנו, כמה חזר ומה עוד אפשר לקבל</Body>
-        {d.services.length === 0 ? (
-          <Card>
-            <Body muted>יופיע כאן אחרי שתצלמו קבלות.</Body>
-          </Card>
-        ) : (
-          <>
-            {(openServices ? d.services : d.services.slice(0, 5)).map((s) => (
-              <ServiceRow key={`${s.memberId}-${s.category}`} s={s} showName={new Set(d.services.map((x) => x.memberId)).size > 1} />
-            ))}
-            {d.services.length > 5 ? (
-              <Button title={openServices ? "פחות" : `עוד ${d.services.length - 5} שירותים`} variant="ghost" onPress={() => setOpenServices((v) => !v)} />
-            ) : null}
-          </>
-        )}
+        <Card tone="primary" onPress={() => router.push("/scan-card")}>
+          <Spread>
+            <Body style={{ flex: 1, fontWeight: "700" }}>💳 סריקת פירוט כרטיס האשראי</Body>
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+          </Spread>
+          <Body muted>נמצא תשלומים לרופאים, מכונים וטיפולים שאין עליהם קבלה באפליקציה</Body>
+        </Card>
+
+        <Card onPress={() => router.push("/premiums")}>
+          <Spread>
+            <Body style={{ flex: 1, fontWeight: "700" }}>💼 מה הביטוחים נותנים לנו</Body>
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>←</Text>
+          </Spread>
+          <Body muted>כמה שילמנו על כל ביטוח מול כמה הוא החזיר</Body>
+        </Card>
       </View>
 
       <Body muted>
@@ -151,55 +146,6 @@ function Stat({ label, agorot, color }: { label: string; agorot: number; color: 
       <Text style={{ fontSize: type.caption, color: colors.muted }}>{label}</Text>
       <Text style={{ fontSize: type.body + 1, fontWeight: "800", color }}>{formatILS(agorot)}</Text>
     </View>
-  );
-}
-
-function go(a: MoneyAction) {
-  switch (a.type) {
-    case "claim":
-      return router.push(`/claim/${a.id}`);
-    case "receipt":
-      return router.push(`/receipt/${a.id}`);
-    case "policy":
-      return router.push(`/policy/${a.memberId}/${a.planId}`);
-    case "capture":
-    case "lead":
-      return router.push("/capture");
-    case "benefits":
-      return router.push("/entitlements");
-    case "plan_visit":
-      return router.push({ pathname: "/before-booking", params: { memberId: a.memberId, category: a.category } });
-  }
-}
-
-function Item({ item, color, onDismiss }: { item: MoneyItemDto; color: string; onDismiss: (id: string) => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-  const action = item.action;
-  return (
-    <Card tone={item.urgent ? "warning" : undefined} onPress={action && action.type !== "lead" ? () => go(action) : undefined}>
-      <Spread>
-        <Body style={{ flex: 1, fontWeight: "700" }}>{item.title}</Body>
-        {item.amountAgorot ? <Text style={{ fontSize: type.body, fontWeight: "800", color }}>{formatILS(item.amountAgorot)}</Text> : null}
-      </Spread>
-      {item.detail ? <Body muted>{item.detail}</Body> : null}
-      {item.urgent ? <Badge label="דחוף" tone="warning" /> : null}
-      {action?.type === "lead" ? (
-        <Row>
-          <Button title="צלמו קבלה" icon="📷" variant="secondary" onPress={() => go(action)} />
-          <Button
-            title="לא רלוונטי"
-            variant="ghost"
-            loading={busy}
-            onPress={() => {
-              setBusy(true);
-              void onDismiss(action.id).finally(() => setBusy(false));
-            }}
-          />
-        </Row>
-      ) : action ? (
-        <Text style={{ fontSize: type.small, color: colors.primary, fontWeight: "700" }}>{ACTION_TITLE[action.type]} ←</Text>
-      ) : null}
-    </Card>
   );
 }
 
