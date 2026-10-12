@@ -116,7 +116,7 @@ export const pushTokenSchema = z.object({
 export const feeDisputeSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 
 /** Each consent is separate and revocable (Privacy Protection Authority opinion on consent, 2026). */
-export const CONSENT_KINDS = ["terms", "privacy", "medical_data", "ai_processing", "poa", "marketing"] as const;
+export const CONSENT_KINDS = ["terms", "privacy", "medical_data", "ai_processing", "poa", "marketing", "financial_data"] as const;
 export type ConsentKind = (typeof CONSENT_KINDS)[number];
 /** Without these the service cannot work; the others are optional. */
 export const REQUIRED_CONSENTS: ConsentKind[] = ["terms", "privacy", "medical_data"];
@@ -496,7 +496,16 @@ export interface MoneyDto {
   /** The few things worth doing now, most urgent and most money first (from missed, waiting and save). */
   nextSteps: MoneyItemDto[];
   /** Where money may still be hiding: the discovery steps this family has (not) done. */
-  discovery: { receipts: number; policiesImported: boolean; cardScanned: boolean; premiumsEntered: boolean };
+  discovery: {
+    receipts: number;
+    policiesImported: boolean;
+    cardScanned: boolean;
+    premiumsEntered: boolean;
+    /** At least one receipt arrived by email. */
+    emailInbox: boolean;
+    /** An active bank / credit card connection. */
+    bankConnected: boolean;
+  };
 }
 
 // ---------- Credit card statement scan: medical payments that may still be refundable ----------
@@ -620,4 +629,31 @@ export interface PremiumsDto {
   /** The same service covered by two private policies for the same person. */
   overlaps: Array<{ memberName: string; label: string; icon: string; planNames: string[] }>;
   notes: string[];
+}
+
+// ---------- Receipts by email ----------
+
+export interface InboxDto {
+  /** The family's private address; null when email intake isn't configured on this server. */
+  address: string | null;
+  recent: Array<{ receivedAt: string; from: string | null; receipts: number; status: "processed" | "no_attachments" | "rejected" }>;
+}
+
+// ---------- Open banking: bank and credit card connections (read-only, via a licensed provider) ----------
+
+export const bankConnectSchema = z.object({
+  platform: z.enum(["web", "native"]),
+  returnUrl: z.string().max(300).optional(),
+});
+
+export interface BankConnectionDto {
+  id: string;
+  status: "pending" | "active" | "failed" | "expired" | "revoked";
+  institutions: string[];
+  createdAt: string;
+  expiresAt: string | null;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  /** Medical payments found through this connection so far. */
+  leadsFound: number;
 }

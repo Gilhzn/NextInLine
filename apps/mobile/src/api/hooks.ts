@@ -48,7 +48,8 @@ export interface NotificationItem {
 export const usePublicConfig = () =>
   useQuery({
     queryKey: keys.publicConfig,
-    queryFn: () => api<{ demoMode: boolean; demoLoginCode: string | null }>("GET", "/v1/public-config"),
+    queryFn: () =>
+      api<{ demoMode: boolean; demoLoginCode: string | null; openBanking: boolean; emailInbox: boolean }>("GET", "/v1/public-config"),
     staleTime: Infinity,
   });
 
@@ -136,6 +137,6 @@ export function useInvalidateAll() {
 export type { RoutingResult };
 
 /** Screens a notification may open by name (anything else is ignored). */
-export const NOTIFICATION_SCREENS = ["/money", "/before-booking", "/entitlements"] as const;
+export const NOTIFICATION_SCREENS = ["/money", "/before-booking", "/entitlements", "/email-receipts", "/connect-bank"] as const;
 export const notificationScreen = (screen: unknown) =>
   NOTIFICATION_SCREENS.find((s) => s === screen) ?? null;

@@ -5,3 +5,4 @@ import "./claims";
 import "./fees";
 import "./privacy";
 import "./maintenance";
+import "./open-banking";

@@ -64,6 +64,14 @@ const configSchema = z
     DPO_NAME: z.string().optional(),
     DPO_EMAIL: z.string().email().optional(),
     ACCESSIBILITY_CONTACT: z.string().optional(),
+    // Receipts by email: the inbound email provider (e.g. Postmark inbound) posts each message to /webhooks/inbound-email.
+    INBOUND_EMAIL_DOMAIN: z
+      .string()
+      .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i)
+      .optional(),
+    INBOUND_EMAIL_SECRET: z.string().min(24).optional(),
+    /** Open banking provider (read-only bank and credit card data). "mock" serves a demo consent page – development only. */
+    OPEN_BANKING_PROVIDER: z.enum(["mock", "none"]).optional(),
     SENTRY_DSN: z.string().url().optional(),
     SENTRY_ENVIRONMENT: z.string().optional(),
     /** Build identifier shown in error reports (Render sets RENDER_GIT_COMMIT). */
@@ -72,6 +80,9 @@ const configSchema = z
   })
   .refine((c) => !(c.NODE_ENV === "production" && c.OTP_DEV_CODE), {
     message: "OTP_DEV_CODE must not be set in production",
+  })
+  .refine((c) => !c.INBOUND_EMAIL_DOMAIN || c.INBOUND_EMAIL_SECRET, {
+    message: "INBOUND_EMAIL_DOMAIN needs INBOUND_EMAIL_SECRET (the inbound webhook's password)",
   });
 
 export type Config = Omit<z.output<typeof configSchema>, "PUBLIC_BASE_URL"> & {

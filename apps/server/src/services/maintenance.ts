@@ -2,6 +2,7 @@ import { formatILS } from "@magiali/shared";
 import type { Deps } from "../context";
 import { enqueue, registerJobHandler } from "./jobs";
 import { notify } from "./notify";
+import { enqueueDueBankSyncs } from "./open-banking";
 import { unusedQuotas } from "./quota";
 
 /** Conservative claim window: policies issued before 11/2020 allow 3 years (newer ones 5). */
@@ -164,6 +165,7 @@ registerJobHandler("daily_maintenance", async (deps) => {
     await warnExpiringReceipts(deps);
     await nudgeSlowPayers(deps);
     await remindUnusedQuotas(deps);
+    await enqueueDueBankSyncs(deps);
     await purgeExpiredFiles(deps);
   } finally {
     await enqueue(deps.sql, "daily_maintenance", {}, { runAt: nextMorning(deps.now()) });

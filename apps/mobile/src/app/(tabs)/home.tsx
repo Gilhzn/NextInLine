@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { formatILS, type MoneyDto } from "@magiali/shared";
 import { api, errorMessage } from "../../api/client";
-import { useHome, useMe, useNotifications } from "../../api/hooks";
+import { useHome, useMe, useNotifications, usePublicConfig } from "../../api/hooks";
 import { colors, radius, space, type } from "../../theme";
 import { Body, Button, Card, ErrorView, Loading, Spread } from "../../ui";
 import { MoneyItemCard } from "../../ui/MoneyItem";
@@ -121,10 +121,17 @@ function MoneyMap({ money, yearPaidAgorot }: { money: MoneyDto; yearPaidAgorot: 
     inFlight ? `${inFlight === 1 ? "תביעה אחת" : `${inFlight} תביעות`} בדרך` : null,
   ].filter(Boolean);
   const d = money.discovery;
+  const config = usePublicConfig().data;
   const discovery = [
     { done: d.receipts >= 3, icon: "🧾", title: "לצלם קבלות מ-3 השנים האחרונות", sub: "אפשר לתבוע עד 3 שנים אחורה", go: "/capture" },
     { done: d.policiesImported, icon: "📥", title: "לייבא את כל הביטוחים מהר הביטוח", sub: "2 דקות, וגם ביטוחים ששכחתם מופיעים", go: "/import" },
-    { done: d.cardScanned, icon: "💳", title: "לסרוק את פירוט האשראי", sub: "נמצא תשלומים לרופאים שאין עליהם קבלה", go: "/scan-card" },
+    // Connecting the cards once beats downloading statements; without a provider, the upload stays.
+    config?.openBanking
+      ? { done: d.bankConnected, icon: "🏦", title: "לחבר את כרטיסי האשראי – פעם אחת", sub: "כל תשלום לרופא בלי קבלה יופיע לבד", go: "/connect-bank" }
+      : { done: d.cardScanned, icon: "💳", title: "לסרוק את פירוט האשראי", sub: "נמצא תשלומים לרופאים שאין עליהם קבלה", go: "/scan-card" },
+    ...(config?.emailInbox
+      ? [{ done: d.emailInbox, icon: "📧", title: "לקבל קבלות ישר מהמייל", sub: "כתובת אישית – מעבירים אליה כל קבלה", go: "/email-receipts" }]
+      : []),
     { done: d.premiumsEntered, icon: "💼", title: "להזין כמה משלמים על הביטוחים", sub: "ונראה מה כל ביטוח החזיר מול מה שעלה", go: "/premiums" },
   ] as const;
   const todo = discovery.filter((x) => !x.done).length;

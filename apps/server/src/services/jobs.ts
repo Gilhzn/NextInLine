@@ -10,7 +10,8 @@ export type JobType =
   | "send_notification"
   | "remind_missing_docs"
   | "purge_deleted_user"
-  | "daily_maintenance";
+  | "daily_maintenance"
+  | "bank_sync";
 
 export type JobHandler = (deps: Deps, payload: Record<string, unknown>, job: { id: number; attempts: number }) => Promise<void>;
 

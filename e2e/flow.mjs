@@ -74,13 +74,14 @@ const phone = `05${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
 const phoneE164 = `+972${phone.slice(1)}`;
 
 /** The ops console token: $ADMIN_TOKEN, or the one `npm run demo` generated in apps/server/.env. */
-function adminToken() {
-  if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
+function serverEnv(name) {
+  if (process.env[name]) return process.env[name];
   const envFile = fs.readFileSync(path.resolve("apps/server/.env"), "utf8");
-  const line = envFile.split("\n").find((l) => l.startsWith("ADMIN_TOKEN="));
-  if (!line) throw new Error("ADMIN_TOKEN not found");
-  return line.slice("ADMIN_TOKEN=".length).trim().replace(/^"|"$/g, "");
+  const line = envFile.split("\n").find((l) => l.startsWith(`${name}=`));
+  if (!line) throw new Error(`${name} not found`);
+  return line.slice(name.length + 1).trim().replace(/^"|"$/g, "");
 }
+const adminToken = () => serverEnv("ADMIN_TOKEN");
 
 await page.goto(BASE_URL);
 await see("בוא נבדוק כמה מגיע לי");
@@ -307,6 +308,42 @@ await click("שמירה");
 await see(/35 ₪ לחודש|₪35 לחודש|35\.00/);
 await see("לא ייעוץ ולא המלצה");
 await shot("premiums");
+
+// Receipts by email: the family's private address; an email with a receipt attached arrives (as the inbound
+// provider would post it) and shows up in the app.
+await page.goto(`${BASE_URL}/email-receipts`);
+await see("הכתובת האישית שלכם");
+const inboxAddress = (await vis(page.getByText(/^r-[a-z0-9]+@/)).first().textContent()).trim();
+const inboundRes = await fetch(`${BASE_URL}/webhooks/inbound-email`, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    authorization: `Basic ${Buffer.from(`inbound:${serverEnv("INBOUND_EMAIL_SECRET")}`).toString("base64")}`,
+  },
+  body: JSON.stringify({
+    FromFull: { Email: "billing@clinic.example" },
+    ToFull: [{ Email: inboxAddress }],
+    Attachments: [{ Name: "receipt.png", ContentType: "image/png", Content: fs.readFileSync(receiptPath).toString("base64") }],
+  }),
+});
+if (!inboundRes.ok) throw new Error(`inbound email: HTTP ${inboundRes.status}`);
+await page.reload();
+await see("billing@clinic.example");
+await see("נקלט – קבלה אחת");
+await shot("email-receipts");
+
+// Open banking: one consent at the (demo) provider, then medical payments without a receipt appear by themselves.
+await page.goto(`${BASE_URL}/connect-bank`);
+await see("חיבור בנק וכרטיסי אשראי");
+await vis(page.getByRole("checkbox", { name: "קריאת תשלומים מהבנק ומכרטיסי האשראי" })).first().click();
+await click("מאשר/ת, נמשיך לחיבור");
+await page.getByRole("button", { name: "אישור", exact: true }).click();
+await see("✓ מחובר");
+await click("המשך");
+await see("ישראכרט, מקס");
+await click("בדיקה עכשיו");
+await see(/נמצאו 3 תשלומים רפואיים/);
+await shot("connect-bank");
 
 for (const [doc, text] of [["terms", "14 יום"], ["privacy", "הממונה על הגנת הפרטיות"], ["poa", "ייפוי הכוח לא מאפשר"]]) {
   await page.goto(`${BASE_URL}/legal/${doc}`);

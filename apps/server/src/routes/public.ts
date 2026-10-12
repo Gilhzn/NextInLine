@@ -18,6 +18,8 @@ export async function publicRoutes(app: FastifyInstance, deps: Deps): Promise<vo
   app.get("/v1/public-config", async () => ({
     demoMode: !!deps.config.OTP_DEV_CODE,
     demoLoginCode: deps.config.OTP_DEV_CODE ?? null,
+    openBanking: !!deps.openBanking,
+    emailInbox: !!deps.config.INBOUND_EMAIL_DOMAIN,
   }));
 
   const otpLimit = { config: { rateLimit: { max: deps.config.OTP_ROUTE_LIMIT_PER_10MIN, timeWindow: "10 minutes" } } };

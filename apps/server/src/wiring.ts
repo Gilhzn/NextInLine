@@ -1,6 +1,7 @@
 import type { Config } from "./config";
 import type { Deps } from "./context";
 import { Crypto } from "./crypto";
+import { MockOpenBanking } from "./open-banking";
 import type { Sql } from "./db";
 import { ClaudeExtractor, ManualExtractor } from "./extraction";
 import { ClaudePolicyReader, ManualPolicyReader } from "./policy-reader";
@@ -15,6 +16,8 @@ export interface ProviderSummary {
   payments: string;
   extraction: string;
   push: string;
+  openBanking: string;
+  inboundEmail: string;
 }
 
 /** Picks a real service when its credentials are configured, otherwise the development stand-in. */
@@ -71,6 +74,8 @@ export function createDeps(config: Config, sql: Sql): { deps: Deps; summary: Pro
     policyReader: config.extractionProvider === "claude" ? new ClaudePolicyReader(config.ANTHROPIC_API_KEY) : new ManualPolicyReader(),
     statementReader:
       config.extractionProvider === "claude" ? new ClaudeStatementReader(config.ANTHROPIC_API_KEY) : new ManualStatementReader(),
+    // Development gets the demo consent page; production stays off until a licensed provider is contracted.
+    openBanking: (config.OPEN_BANKING_PROVIDER ?? (config.NODE_ENV === "production" ? "none" : "mock")) === "mock" ? new MockOpenBanking() : null,
     now: () => new Date(),
   };
 
@@ -86,6 +91,8 @@ export function createDeps(config: Config, sql: Sql): { deps: Deps; summary: Pro
           : "mock (dev)",
       extraction: extractor.name,
       push: "expo",
+      openBanking: deps.openBanking ? `${deps.openBanking.name}${deps.openBanking instanceof MockOpenBanking ? " (dev)" : ""}` : "off",
+      inboundEmail: config.INBOUND_EMAIL_DOMAIN ? `on (${config.INBOUND_EMAIL_DOMAIN})` : "off",
     },
   };
 }
@@ -105,6 +112,7 @@ export function productionProblems(config: Config, summary: ProviderSummary): st
   if (config.WEB_DIR && !config.PUBLIC_BASE_URL.startsWith("https://") && config.PUBLIC_BASE_URL !== "") {
     problems.push("PUBLIC_BASE_URL must be https in production");
   }
+  if (summary.openBanking.includes("dev")) problems.push("OPEN_BANKING_PROVIDER: the demo provider can't run in production – set it to none until a licensed provider is connected");
   if (!config.OPS_PHONES) problems.push("OPS_PHONES: list the operators' mobile numbers for /ops (the shared token is off in production)");
   const legal = ["LEGAL_ENTITY_NAME", "LEGAL_ENTITY_ID", "LEGAL_ADDRESS", "CONTACT_EMAIL", "DPO_NAME", "DPO_EMAIL"] as const;
   const missingLegal = legal.filter((k) => !config[k]);
@@ -124,6 +132,7 @@ export function productionWarnings(config: Config, summary: ProviderSummary): st
   const warnings: string[] = [];
   if (summary.extraction === "manual") warnings.push("ANTHROPIC_API_KEY is not set: users will type receipt details by hand");
   if (summary.payments.startsWith("cardcom") && !config.CARDCOM_API_PASSWORD) warnings.push("CARDCOM_API_PASSWORD is not set: refunds from /ops will fail");
+  if (!config.INBOUND_EMAIL_DOMAIN) warnings.push("INBOUND_EMAIL_DOMAIN is not set: receipts by email are off");
   if (!config.SENTRY_DSN) warnings.push("SENTRY_DSN is not set: errors are only in the logs");
   return warnings;
 }

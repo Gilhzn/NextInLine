@@ -10,6 +10,7 @@ import { adminRoutes } from "./routes/admin";
 import { opsRoutes } from "./routes/ops";
 import { legalRoutes } from "./routes/legal";
 import { paymentRoutes } from "./routes/payments";
+import { intakeRoutes } from "./routes/intake";
 import { publicRoutes } from "./routes/public";
 import { userRoutes } from "./routes/user";
 import { webRoutes } from "./routes/web";
@@ -57,6 +58,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: { code: "not_found", message: "לא נמצא" } }));
 
   await app.register(async (scope) => publicRoutes(scope, deps));
+  await app.register(async (scope) => intakeRoutes(scope, deps));
   await app.register(async (scope) => userRoutes(scope, deps), { prefix: "/v1" });
   await app.register(async (scope) => adminRoutes(scope, deps), { prefix: "/admin" });
   await app.register(async (scope) => opsRoutes(scope, deps));

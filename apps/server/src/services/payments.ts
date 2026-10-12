@@ -9,7 +9,7 @@ export type SetupStatus = "pending" | "completed" | "failed";
 const SETUP_TTL_MS = 30 * 60_000;
 
 /** Native apps come back through their own URL scheme (or Expo Go's while developing). */
-const NATIVE_RETURN = /^(magiali|exp|exps):\/\/[\w./:@%-]*$/;
+export const NATIVE_RETURN = /^(magiali|exp|exps):\/\/[\w./:@%-]*$/;
 
 function webhookSignature(deps: Deps, setupId: string): string {
   return hmacHex(deps.config.FILES_SIGNING_SECRET, `payment-setup:${setupId}`);

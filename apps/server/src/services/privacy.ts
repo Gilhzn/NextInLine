@@ -1,5 +1,6 @@
 import type { AuthContext, Deps } from "../context";
 import { audit } from "./audit";
+import { revokeAllBankConnections } from "./open-banking";
 import { enqueue, registerJobHandler } from "./jobs";
 
 const PURGE_DELAY_DAYS = 30;
@@ -14,7 +15,9 @@ export async function exportData(deps: Deps, ctx: AuthContext): Promise<Record<s
     enrollments: await deps.sql`
       SELECT e.plan_id, e.is_shaban_supplement, e.monthly_premium_agorot, e.created_at FROM enrollments e JOIN members m ON m.id = e.member_id
       WHERE m.household_id = ${h}`,
-    paymentLeads: await deps.sql`SELECT merchant, paid_on, amount_agorot, category, status, created_at FROM payment_leads WHERE household_id = ${h}`,
+    paymentLeads: await deps.sql`SELECT merchant, paid_on, amount_agorot, category, status, source, created_at FROM payment_leads WHERE household_id = ${h}`,
+    bankConnections: await deps.sql`SELECT provider, status, institutions, created_at, last_synced_at FROM bank_connections WHERE household_id = ${h}`,
+    emailsReceived: await deps.sql`SELECT from_address, attachments, receipts, status, received_at FROM inbound_emails WHERE household_id = ${h}`,
     receipts: await deps.sql`
       SELECT id, member_id, category, provider_name, service_date, amount_agorot, sessions, extraction_status, created_at
       FROM receipts WHERE household_id = ${h}`,
@@ -51,6 +54,9 @@ export async function deleteAccount(deps: Deps, ctx: AuthContext): Promise<void>
       runAt: new Date(now.getTime() + PURGE_DELAY_DAYS * 86_400_000),
     });
   });
+  // Stop access right away: no more emails into the account, and every bank consent ended at the provider.
+  await deps.sql`UPDATE households SET inbox_token = NULL WHERE id = ${ctx.householdId}`;
+  await revokeAllBankConnections(deps, ctx.householdId);
   await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "account_deleted", entity: "user", entityId: ctx.userId });
 }
 
@@ -70,6 +76,8 @@ registerJobHandler("purge_deleted_user", async (deps, payload) => {
       UPDATE members SET full_name = 'נמחק', birth_date = NULL, consent_phone_e164 = NULL, deleted_at = COALESCE(deleted_at, ${deps.now()})
       WHERE household_id = ${householdId}`;
     await tx`DELETE FROM payment_leads WHERE household_id = ${householdId}`;
+    await tx`DELETE FROM bank_connections WHERE household_id = ${householdId}`;
+    await tx`DELETE FROM inbound_emails WHERE household_id = ${householdId}`;
     await tx`DELETE FROM enrollments WHERE member_id IN (SELECT id FROM members WHERE household_id = ${householdId})`;
     await tx`DELETE FROM notifications WHERE user_id = ${payload.userId as string}`;
     await tx`DELETE FROM otp_challenges WHERE member_id IN (SELECT id FROM members WHERE household_id = ${householdId})`;

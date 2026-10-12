@@ -49,6 +49,8 @@ function values(deps: Deps, origin: string): Record<string, string> {
     SMS_REGION: c.TWILIO_ACCOUNT_SID ? "ארה״ב" : "—",
     EMAIL_PROVIDER: c.RESEND_API_KEY ? "Resend" : "ספק דוא״ל",
     SENTRY_REGION: c.SENTRY_DSN?.includes(".de.sentry.io") ? "האיחוד האירופי" : "ארה״ב",
+    INBOUND_EMAIL_PROVIDER: "Postmark",
+    INBOUND_EMAIL_REGION: "ארה״ב",
   };
 }
 

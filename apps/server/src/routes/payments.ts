@@ -5,7 +5,7 @@ import { parse } from "../http";
 import { MockPayments } from "../providers";
 import { refreshCardSetup, verifyWebhookSignature } from "../services/payments";
 
-const page = (title: string, body: string) => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+export const page = (title: string, body: string) => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
 <style>body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#F8FAFC;color:#0F172A;margin:0;padding:24px;display:flex;justify-content:center}
 main{max-width:420px;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px}
@@ -14,7 +14,7 @@ input{width:100%;box-sizing:border-box;font-size:18px;padding:12px;border:1.5px 
 button,a.btn{display:block;width:100%;margin-top:20px;padding:14px;border:0;border-radius:12px;background:#0F766E;color:#fff;font-size:17px;font-weight:700;text-align:center;text-decoration:none}
 .note{font-size:13px;background:#FEF3C7;border-radius:10px;padding:10px;color:#92400E}</style></head><body><main>${body}</main></body></html>`;
 
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Public origin of this server, for links handed to the payment provider. */
 export function publicOrigin(deps: Deps, req: FastifyRequest): string {

@@ -13,7 +13,9 @@ export type NotificationType =
   | "claim_submitted"
   | "expiry_warning"
   | "slow_payer"
-  | "quota_reminder";
+  | "quota_reminder"
+  | "email_receipt"
+  | "bank_sync";
 
 const QUIET_START = 21;
 const QUIET_END = 8;

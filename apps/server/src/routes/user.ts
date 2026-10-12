@@ -13,6 +13,7 @@ import {
   entitlementEstimateSchema,
   beforeBookingSchema,
   premiumPutSchema,
+  bankConnectSchema,
   paymentLeadsSaveSchema,
   feeDisputeSchema,
   legStatusUpdateSchema,
@@ -50,6 +51,15 @@ import { entitlementSummary, estimateEntitlements } from "../services/entitlemen
 import { moneyOverview } from "../services/money";
 import { beforeBooking } from "../services/before-booking";
 import { premiumsOverview, setPremium } from "../services/premiums";
+import { getInbox, rotateInbox } from "../services/inbox";
+import {
+  listBankConnections,
+  refreshBankConnection,
+  requestBankSync,
+  revokeAllBankConnections,
+  revokeBankConnection,
+  startBankConnection,
+} from "../services/open-banking";
 import { dismissPaymentLead, savePaymentLeads, scanStatement } from "../services/card-scan";
 import { publicOrigin } from "./payments";
 import { getHome } from "../services/home";
@@ -126,6 +136,8 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
     const ctx = auth(req);
     const kind = parse(z.enum(CONSENT_KINDS), req.params.kind);
     await revokeConsent(deps.sql, ctx.userId, kind);
+    // Withdrawing the payments consent ends every bank connection at the provider too.
+    if (kind === "financial_data") await revokeAllBankConnections(deps, ctx.householdId);
     await audit(deps.sql, { actorUserId: ctx.userId, actorKind: "user", action: "consent_revoked", entity: "consent", entityId: kind, ip: req.ip });
     return getMe(deps, ctx.userId);
   });
@@ -185,6 +197,25 @@ export async function userRoutes(app: FastifyInstance, deps: Deps): Promise<void
   });
 
   app.get("/premiums", async (req) => premiumsOverview(deps, auth(req)));
+
+  // Receipts by email: the family's private address and what arrived.
+  app.get("/inbox", async (req) => getInbox(deps, auth(req)));
+  app.post("/inbox/rotate", async (req) => rotateInbox(deps, auth(req)));
+
+  // Open banking: read-only bank and credit card connections through a licensed provider.
+  app.get("/bank-connections", async (req) => listBankConnections(deps, auth(req)));
+  app.post("/bank-connections", async (req) => {
+    const input = parse(bankConnectSchema, req.body);
+    return startBankConnection(deps, auth(req), { ...input, origin: publicOrigin(deps, req) });
+  });
+  app.get<{ Params: { id: string } }>("/bank-connections/:id", async (req) =>
+    refreshBankConnection(deps, parse(idParam, req.params).id, auth(req)),
+  );
+  app.post<{ Params: { id: string } }>("/bank-connections/:id/sync", async (req) => requestBankSync(deps, auth(req), parse(idParam, req.params).id));
+  app.delete<{ Params: { id: string } }>("/bank-connections/:id", async (req, reply) => {
+    await revokeBankConnection(deps, auth(req), parse(idParam, req.params).id);
+    return reply.status(204).send();
+  });
 
   app.get("/members/:id/enrollments", async (req) => {
     const { id } = parse(idParam, req.params);

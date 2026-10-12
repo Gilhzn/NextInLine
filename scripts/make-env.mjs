@@ -21,6 +21,9 @@ const env = {
   ADMIN_TOKEN: secret(32),
   STORAGE_DIR: "./storage",
   OTP_DEV_CODE: "123456",
+  // Receipts by email: in the demo, messages are posted to /webhooks/inbound-email directly (see e2e/flow.mjs).
+  INBOUND_EMAIL_DOMAIN: "in.magiali.local",
+  INBOUND_EMAIL_SECRET: secret(24),
 };
 writeFileSync(target, Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
 console.log("created apps/server/.env (demo login code: 123456)");

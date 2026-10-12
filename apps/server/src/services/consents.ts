@@ -10,6 +10,7 @@ export async function hasConsent(db: Db, userId: string, kind: ConsentKind): Pro
 const MISSING: Partial<Record<ConsentKind, string>> = {
   medical_data: "כדי לשמור קבלות רפואיות צריך את הסכמתך לעיבוד מידע רפואי",
   poa: "כדי שנגיש בשמך צריך לחתום על ייפוי הכוח",
+  financial_data: "כדי לחבר בנק או כרטיס אשראי צריך את הסכמתך לקריאת התשלומים",
 };
 
 export async function requireConsent(db: Db, userId: string, kind: ConsentKind): Promise<void> {

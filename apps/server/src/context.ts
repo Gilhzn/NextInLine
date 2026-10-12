@@ -2,6 +2,7 @@ import type { Config } from "./config";
 import type { Crypto } from "./crypto";
 import type { Sql } from "./db";
 import type { ReceiptExtractor } from "./extraction";
+import type { OpenBankingProvider } from "./open-banking";
 import type { PolicyReportReader } from "./policy-reader";
 import type { StatementReader } from "./statement-reader";
 import type { EmailProvider, PaymentProvider, PushProvider, SmsProvider, StorageProvider } from "./providers";
@@ -19,6 +20,8 @@ export interface Deps {
   extractor: ReceiptExtractor;
   policyReader: PolicyReportReader;
   statementReader: StatementReader;
+  /** null when no open banking provider is configured (the feature is hidden). */
+  openBanking: OpenBankingProvider | null;
   now: () => Date;
 }
 

@@ -283,7 +283,9 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
       EXISTS (SELECT 1 FROM audit_log WHERE entity = 'household' AND entity_id = ${ctx.householdId}::text
               AND action = 'card_statement_scanned') AS scanned,
       EXISTS (SELECT 1 FROM enrollments e JOIN members m ON m.id = e.member_id
-              WHERE m.household_id = ${ctx.householdId} AND e.monthly_premium_agorot IS NOT NULL) AS premiums`;
+              WHERE m.household_id = ${ctx.householdId} AND e.monthly_premium_agorot IS NOT NULL) AS premiums,
+      EXISTS (SELECT 1 FROM receipts WHERE household_id = ${ctx.householdId} AND source = 'email') AS email,
+      EXISTS (SELECT 1 FROM bank_connections WHERE household_id = ${ctx.householdId} AND status = 'active') AS bank`;
 
   return {
     range,
@@ -302,6 +304,8 @@ export async function moneyOverview(deps: Deps, ctx: AuthContext, range: "year" 
       policiesImported: found!.imported as boolean,
       cardScanned: found!.scanned as boolean,
       premiumsEntered: found!.premiums as boolean,
+      emailInbox: found!.email as boolean,
+      bankConnected: found!.bank as boolean,
     },
   };
 }

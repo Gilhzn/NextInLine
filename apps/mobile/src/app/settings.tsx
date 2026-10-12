@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Platform, Switch } from "react-native";
+import { Switch } from "react-native";
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CATEGORY_INFO, formatILS, type FeeDto } from "@magiali/shared";
@@ -10,6 +10,7 @@ import { colors, space } from "../theme";
 import { Badge, Body, Button, Card, Loading, Screen, Spread, Title } from "../ui";
 import { PaymentMethodForm } from "../ui/PaymentMethodForm";
 import { CONSENT_COPY, useConsents } from "../ui/Consents";
+import { confirm } from "../lib/confirm";
 import { openLegal } from "../lib/legal";
 import { useQuery } from "@tanstack/react-query";
 
@@ -22,16 +23,6 @@ const FEE_STATUS: Record<FeeDto["status"], { label: string; tone: "primary" | "m
   failed: { label: "החיוב נכשל", tone: "danger" },
   refunded: { label: "הוחזרה", tone: "muted" },
 };
-
-function confirm(title: string, message: string): Promise<boolean> {
-  if (Platform.OS === "web") return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? false);
-  return new Promise((resolve) =>
-    Alert.alert(title, message, [
-      { text: "ביטול", style: "cancel", onPress: () => resolve(false) },
-      { text: "כן, למחוק", style: "destructive", onPress: () => resolve(true) },
-    ]),
-  );
-}
 
 export default function Settings() {
   const me = useMe();
@@ -67,7 +58,7 @@ export default function Settings() {
   }
 
   async function deleteAccount() {
-    const ok = await confirm("מחיקת החשבון", "כל המידע והקבלות יימחקו. תביעות פתוחות יבוטלו. אי אפשר לבטל את הפעולה.");
+    const ok = await confirm("מחיקת החשבון", "כל המידע והקבלות יימחקו. תביעות פתוחות יבוטלו. אי אפשר לבטל את הפעולה.", "כן, למחוק");
     if (!ok) return;
     try {
       await api("DELETE", "/v1/me");
@@ -112,9 +103,16 @@ export default function Settings() {
       </Card>
 
       <Card>
+        <Body style={{ fontWeight: "700" }}>📥 איך מידע נכנס לאפליקציה</Body>
+        <Button title="קבלות במייל – הכתובת שלכם" icon="📧" variant="ghost" onPress={() => router.push("/email-receipts")} />
+        <Button title="חיבור בנק וכרטיסי אשראי" icon="🏦" variant="ghost" onPress={() => router.push("/connect-bank")} />
+        <Button title="ייבוא מהר הביטוח" icon="📥" variant="ghost" onPress={() => router.push("/import")} />
+      </Card>
+
+      <Card>
         <Body style={{ fontWeight: "700" }}>🔒 הסכמות</Body>
         <Body muted>כל הסכמה עומדת בפני עצמה. ביטול חל מעכשיו והלאה.</Body>
-        {(["medical_data", "ai_processing", "poa", "marketing"] as const).map((kind) => (
+        {(["medical_data", "ai_processing", "financial_data", "poa", "marketing"] as const).map((kind) => (
           <Spread key={kind} style={{ paddingVertical: space.xs }}>
             <Body style={{ flex: 1 }}>{CONSENT_COPY[kind].label}</Body>
             <Switch

@@ -48,6 +48,14 @@ services:
       # Your own domain, e.g. https://app.magiali.co.il (optional; Render's URL is used otherwise)
       - key: PUBLIC_BASE_URL
         sync: false
+      # --- Receipts by email (inbound provider, e.g. Postmark inbound; see docs/production.md) ---
+      - key: INBOUND_EMAIL_DOMAIN
+        sync: false
+      - key: INBOUND_EMAIL_SECRET
+        generateValue: true
+      # --- Open banking: off until a licensed financial-information provider is connected ---
+      - key: OPEN_BANKING_PROVIDER
+        value: none
       # --- Operators (mobile numbers, comma separated) ---
       - key: OPS_PHONES
         sync: false

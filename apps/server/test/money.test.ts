@@ -80,7 +80,14 @@ describe("our health money", () => {
     expect(money.nextSteps[0]).toMatchObject({ kind: "unclaimed_receipt", urgent: true });
     expect(money.nextSteps.length).toBeLessThanOrEqual(4);
     expect(money.nextSteps.some((i: any) => i.kind === "in_flight")).toBe(false);
-    expect(money.discovery).toEqual({ receipts: 5, policiesImported: false, cardScanned: false, premiumsEntered: false });
+    expect(money.discovery).toEqual({
+      receipts: 5,
+      policiesImported: false,
+      cardScanned: false,
+      premiumsEntered: false,
+      emailInbox: false,
+      bankConnected: false,
+    });
 
     // The last 3 years include the old receipt too.
     const three = expectStatus(await user.get("/v1/money?range=3y"), 200);

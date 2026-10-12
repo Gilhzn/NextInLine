@@ -12,10 +12,12 @@ import { Crypto } from "../src/crypto";
 import { createSql, migrate, type Sql } from "../src/db";
 import { RetryableExtractionError, type ReceiptExtractor } from "../src/extraction";
 import { MemoryEmail, MemoryPush, MemorySms, MemoryStorage, MockPayments } from "../src/providers";
+import { MockOpenBanking } from "../src/open-banking";
 import { runDueJobs } from "../src/services/jobs";
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL ?? "postgres://magiali:magiali@localhost:5432/postgres";
 export const ADMIN_TOKEN = "test-admin-token-0123456789abcdef";
+export const INBOUND_SECRET = "test-inbound-secret-0123456789abcdef";
 
 export class FakeExtractor implements ReceiptExtractor {
   readonly name = "fake";
@@ -69,6 +71,7 @@ export interface TestEnv {
   extractor: FakeExtractor;
   policyReader: FakePolicyReader;
   statementReader: FakeStatementReader;
+  openBanking: MockOpenBanking;
   clock: { readonly now: Date; advanceDays(days: number): void };
   runJobs(): Promise<number>;
   close(): Promise<void>;
@@ -96,6 +99,8 @@ export async function createTestEnv(): Promise<TestEnv> {
     PUBLIC_BASE_URL: "http://localhost:4000",
     OTP_MAX_PER_IP_HOUR: "10000",
     OTP_ROUTE_LIMIT_PER_10MIN: "10000",
+    INBOUND_EMAIL_DOMAIN: "in.magiali.test",
+    INBOUND_EMAIL_SECRET: INBOUND_SECRET,
   });
 
   // Tracks real time plus an offset, so rows stamped by the database (now()) stay consistent with the app clock.
@@ -115,6 +120,7 @@ export async function createTestEnv(): Promise<TestEnv> {
   const extractor = new FakeExtractor();
   const policyReader = new FakePolicyReader();
   const statementReader = new FakeStatementReader();
+  const openBanking = new MockOpenBanking(() => clock.now);
   const deps: Deps = {
     config,
     sql,
@@ -127,6 +133,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     extractor,
     policyReader,
     statementReader,
+    openBanking,
     now: () => clock.now,
   };
   const app = await buildApp(deps);
@@ -142,6 +149,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     extractor,
     policyReader,
     statementReader,
+    openBanking,
     clock,
     async runJobs() {
       let total = 0;

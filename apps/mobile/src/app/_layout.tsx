@@ -71,6 +71,9 @@ function RootLayout() {
           <Stack.Screen name="scan-card" options={{ headerShown: true, title: "סריקת פירוט האשראי" }} />
           <Stack.Screen name="before-booking" options={{ headerShown: true, title: "לפני שקובעים תור" }} />
           <Stack.Screen name="premiums" options={{ headerShown: true, title: "מה הביטוחים נותנים לנו" }} />
+          <Stack.Screen name="email-receipts" options={{ headerShown: true, title: "קבלות במייל" }} />
+          <Stack.Screen name="connect-bank" options={{ headerShown: true, title: "חיבור בנק וכרטיסים" }} />
+          <Stack.Screen name="bank-return" options={{ headerShown: true, title: "חיבור בנק וכרטיסים" }} />
           <Stack.Screen name="payment-return" options={{ headerShown: true, title: "אמצעי תשלום" }} />
           <Stack.Screen name="notifications" options={{ headerShown: true, title: "התראות" }} />
         </Stack>}

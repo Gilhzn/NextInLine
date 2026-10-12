@@ -103,7 +103,7 @@ afterAll(async () => {
 describe("demo & operations", () => {
   it("public config says whether the demo login code is active", async () => {
     const res = expectStatus(await env.app.inject({ method: "GET", url: "/v1/public-config" }), 200);
-    expect(res).toEqual({ demoMode: false, demoLoginCode: null });
+    expect(res).toEqual({ demoMode: false, demoLoginCode: null, openBanking: true, emailInbox: true });
   });
 
   it("serves the ops console page", async () => {
